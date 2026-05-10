@@ -1,0 +1,357 @@
+{
+  "app_name": "Job Credits Tracker",
+  "version": "1.0",
+  "description": "Mobile-first PWA for tracking weekly job credits against an adjustable target. Engineers log jobs throughout the day, add deductions, and track whether they've hit their weekly bonus target.",
+
+  "conversion": {
+    "formula": "credits = minutes / 83.58",
+    "basis": "56 minutes = 0.67 job credits"
+  },
+
+  "weekly_target": {
+    "default_base_hours": 40,
+    "adjustable": true,
+    "notes": "Base hours adjustable per user. Deductions (travel, absences, waiting etc.) are subtracted from base hours to get adjusted target. Total earned credits (converted to hours) must exceed adjusted target for bonus. Travel data arrives ~10 days after the week, so previous weeks must be editable."
+  },
+
+  "job_types": {
+    "core_jobs": [
+      {
+        "id": "ib_ff",
+        "name": "IB, FF (All Appliance Types)",
+        "category": "Core",
+        "minutes": 56,
+        "credits": 0.67,
+        "variable": false
+      },
+      {
+        "id": "linked_ib",
+        "name": "Linked IB (Job on same appliance as ASV)",
+        "category": "Core",
+        "minutes": 56,
+        "credits": 0.67,
+        "variable": false
+      },
+      {
+        "id": "asv_chb_cir_wh_swh",
+        "name": "ASV (CHB, CIR, WH, SWH)",
+        "category": "Core",
+        "minutes": 40,
+        "credits": 0.48,
+        "variable": false
+      },
+      {
+        "id": "asv_fre",
+        "name": "ASV (FRE)",
+        "category": "Core",
+        "minutes": 47,
+        "credits": 0.56,
+        "variable": false
+      },
+      {
+        "id": "asv_hob_ckr_ovn",
+        "name": "ASV (HOB, CKR, OVN)",
+        "category": "Core",
+        "minutes": 23,
+        "credits": 0.28,
+        "variable": false
+      },
+      {
+        "id": "asv_mwh_wal",
+        "name": "ASV (MWH, WAL)",
+        "category": "Core",
+        "minutes": 35,
+        "credits": 0.42,
+        "variable": false
+      },
+      {
+        "id": "asv_bbf_wau_waw_aga",
+        "name": "ASV (BBF, WAU, WAW, AGA)",
+        "category": "Core",
+        "minutes": 63,
+        "credits": 0.75,
+        "variable": false
+      },
+      {
+        "id": "as_inst",
+        "name": "AS - INST (Landlords Inspection)",
+        "category": "Core",
+        "minutes": 21,
+        "credits": 0.25,
+        "variable": false
+      },
+      {
+        "id": "fv_chb",
+        "name": "FV (CHB)",
+        "category": "Core",
+        "minutes": 48,
+        "credits": 0.57,
+        "variable": false
+      },
+      {
+        "id": "fv_bbf_wau_waw",
+        "name": "FV (BBF, WAU, WAW)",
+        "category": "Core",
+        "minutes": 71,
+        "credits": 0.85,
+        "variable": false
+      },
+      {
+        "id": "ld_completed",
+        "name": "LD (Completed)",
+        "category": "Core",
+        "minutes": 205,
+        "credits": 2.45,
+        "variable": false
+      },
+      {
+        "id": "upgrade_work",
+        "name": "Upgrade Work (per hour quoted)",
+        "category": "Core",
+        "minutes": 60,
+        "credits": 0.72,
+        "variable": true,
+        "variable_type": "hours",
+        "variable_prompt": "Enter number of hours quoted"
+      },
+      {
+        "id": "standalone_quote",
+        "name": "Standalone Quote Job",
+        "category": "Core",
+        "minutes": 31,
+        "credits": 0.37,
+        "variable": false
+      },
+      {
+        "id": "free_gas_safety",
+        "name": "Free Gas Safety Check",
+        "category": "Core",
+        "minutes": 30,
+        "credits": 0.36,
+        "variable": false
+      },
+      {
+        "id": "oca",
+        "name": "OCA (All Appliance Types)",
+        "category": "Core",
+        "minutes": 56,
+        "credits": 0.67,
+        "variable": false
+      },
+      {
+        "id": "remedial_safety",
+        "name": "Remedial Safety (Only on FV's)",
+        "category": "Core",
+        "minutes": 30,
+        "credits": 0.36,
+        "variable": false
+      },
+      {
+        "id": "trace_repair",
+        "name": "Trace & Repair",
+        "category": "Core",
+        "minutes": 1,
+        "credits": 0.01,
+        "variable": true,
+        "variable_type": "minutes",
+        "variable_prompt": "Enter number of minutes on completion"
+      },
+      {
+        "id": "install_cod",
+        "name": "Install COD",
+        "category": "Core",
+        "minutes": 5,
+        "credits": 0.06,
+        "variable": false
+      },
+      {
+        "id": "hive_install_generic",
+        "name": "Hive Install",
+        "category": "Core",
+        "minutes": 90,
+        "credits": 1.08,
+        "variable": false
+      }
+    ],
+    "hive_jobs": [
+      {
+        "id": "hvi_hub",
+        "code": "HVI-HUB",
+        "name": "Hive Install - OpenTherm Upgrade",
+        "category": "Hive",
+        "minutes": 40,
+        "credits": 0.48,
+        "variable": false
+      },
+      {
+        "id": "hvi_iio",
+        "code": "HVI-IIO",
+        "name": "Hive Inday Install Offer",
+        "category": "Hive",
+        "minutes": 34,
+        "credits": 0.41,
+        "variable": false,
+        "notes": "Combined activity is 90 mins (Gas Repair 56 + Hive 34). The 34 mins is the Hive portion only."
+      },
+      {
+        "id": "hvi_min",
+        "code": "HVI-MIN",
+        "name": "Hive Install - Mini Thermostat",
+        "category": "Hive",
+        "minutes": 90,
+        "credits": 1.08,
+        "variable": false
+      },
+      {
+        "id": "hvi_imz",
+        "code": "HVI-IMZ",
+        "name": "Hive Install - Multizone",
+        "category": "Hive",
+        "minutes": 30,
+        "credits": 0.36,
+        "variable": false,
+        "notes": "Completed in addition to main thermostat job. One Multizone job per each additional zone."
+      },
+      {
+        "id": "hvi_trv",
+        "code": "HVI-TRV",
+        "name": "Hive Install - TRV",
+        "category": "Hive",
+        "minutes": 30,
+        "credits": 0.36,
+        "variable": false,
+        "notes": "One job per two Hive TRVs"
+      },
+      {
+        "id": "hvi_wls",
+        "code": "HVI-WLS",
+        "name": "Hive Install - Wireless Thermostat",
+        "category": "Hive",
+        "minutes": 90,
+        "credits": 1.08,
+        "variable": false
+      },
+      {
+        "id": "hvi_wrd",
+        "code": "HVI-WRD",
+        "name": "Hive Install - Wired Thermostat",
+        "category": "Hive",
+        "minutes": 60,
+        "credits": 0.72,
+        "variable": false
+      },
+      {
+        "id": "hvr_the",
+        "code": "HVR-THE",
+        "name": "Hive Repair - Thermostat",
+        "category": "Hive",
+        "minutes": 56,
+        "credits": 0.67,
+        "variable": false
+      },
+      {
+        "id": "hvr_trv",
+        "code": "HVR-TRV",
+        "name": "Hive Repair - TRV",
+        "category": "Hive",
+        "minutes": 56,
+        "credits": 0.67,
+        "variable": false
+      },
+      {
+        "id": "hvu_the",
+        "code": "HVU-THE",
+        "name": "Hive Uninstall - Thermostat",
+        "category": "Hive",
+        "minutes": 90,
+        "credits": 1.08,
+        "variable": false
+      },
+      {
+        "id": "inshv_min",
+        "code": "INSHV-MIN",
+        "name": "Install Hive Mini Thermostat (Solvers)",
+        "category": "Hive",
+        "minutes": 90,
+        "credits": 1.08,
+        "variable": false
+      },
+      {
+        "id": "inshv_thr",
+        "code": "INSHV-THR",
+        "name": "Install Hive Thermostat (Solvers)",
+        "category": "Hive",
+        "minutes": 90,
+        "credits": 1.08,
+        "variable": false
+      },
+      {
+        "id": "inshv_trv",
+        "code": "INSHV-TRV",
+        "name": "Install Hive TRVs (Solvers)",
+        "category": "Hive",
+        "minutes": 0,
+        "credits": 0,
+        "variable": true,
+        "variable_type": "minutes",
+        "variable_prompt": "Enter charge time in minutes (linked to charge time)"
+      },
+      {
+        "id": "rchv_thr",
+        "code": "RCHV-THR",
+        "name": "Recall Hive Thermostat",
+        "category": "Hive",
+        "minutes": 56,
+        "credits": 0.67,
+        "variable": false
+      },
+      {
+        "id": "rchv_trv",
+        "code": "RCHV-TRV",
+        "name": "Recall Hive TRVs",
+        "category": "Hive",
+        "minutes": 56,
+        "credits": 0.67,
+        "variable": false
+      }
+    ],
+    "sales": [
+      {
+        "id": "hi_lead",
+        "name": "HI Lead (Boiler Lead)",
+        "category": "Sales",
+        "minutes": 58,
+        "credits": 0.69,
+        "variable": false,
+        "sgo_payment": null,
+        "notes": "No SGO payment, fulfilment credit only"
+      }
+    ]
+  },
+
+  "deductions": {
+    "description": "Single bucket for all non-productive time. Entered in hours/minutes. Subtracted from base weekly hours to calculate adjusted target.",
+    "categories": "None - all deductions are entered as a single total",
+    "entry_format": "hours and minutes",
+    "editable_retroactively": true,
+    "notes": "Travel data arrives ~10 days after the week. Users need to go back and update previous weeks with travel deductions when this data becomes available."
+  },
+
+  "app_requirements": {
+    "platform": "Mobile-first PWA (installable on phone), also accessible via browser for others to download/use",
+    "storage": "Local storage on device with ability to view and edit previous weeks",
+    "features": [
+      "Set adjustable base weekly hours (default 40)",
+      "Log jobs by tapping job type - instant credit calculation",
+      "Trace & Repair and INSHV-TRV prompt for minutes input",
+      "Upgrade Work prompts for hours quoted input",
+      "Log boiler lead sales credits",
+      "Log deductions in hours/minutes",
+      "Daily breakdown view within the week",
+      "Weekly dashboard: total earned credits (hours) vs adjusted target",
+      "Clear indicator of whether bonus target is met",
+      "Edit previous weeks (especially for adding travel deductions ~10 days later)",
+      "Week history - view past weeks and their results"
+    ]
+  }
+}
