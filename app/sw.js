@@ -1,5 +1,12 @@
-const CACHE = 'jct-v2';
-const ASSETS = ['/', '/index.html', '/app.js', '/style.css', '/data.js'];
+const CACHE  = 'jct-v3';
+const BASE   = '/jcpdtracker';
+const ASSETS = [
+  BASE + '/',
+  BASE + '/index.html',
+  BASE + '/app.js',
+  BASE + '/style.css',
+  BASE + '/data.js',
+];
 
 self.addEventListener('install', e => {
   e.waitUntil(caches.open(CACHE).then(c => c.addAll(ASSETS)));
