@@ -6,6 +6,8 @@ let activeJobTab = 'core';   // core | hive | sales
 let pendingJob = null;
 let lastGreeting = '';
 let weekSummaryKey = null;
+let activeLogDay = getTodayKey();
+let jobSearch = '';
 
 // ── Init ───────────────────────────────────────────────────────────────────
 window.addEventListener('error', function(e) {
@@ -47,21 +49,17 @@ function buildTopBar() {
   const todayWk = getWeekKey(new Date());
   const isCurrentWeek = currentWeekKey === todayWk;
   const isFutureWeek = currentWeekKey > todayWk;
-  const maxFuture = new Date(); maxFuture.setDate(maxFuture.getDate() + 56);
-  const atCap = activeTab === 'schedule'
-    ? currentWeekKey >= getWeekKey(maxFuture)
-    : isCurrentWeek;
   return `
     <header class="top-bar">
       <div class="top-title">
         <div class="top-title-main">JCPD Tracker</div>
         <div class="top-title-sub">Service + Repair</div>
       </div>
-      <div class="week-nav">
+      ${activeTab === 'dashboard' ? `<div class="week-nav">
         <button id="prev-week" aria-label="Previous week">&#8249;</button>
         <span>${weekLabel(currentWeekKey)}${isCurrentWeek ? '<span class="week-dot">•</span>' : ''}${isFutureWeek ? '<span class="week-future-badge">FUTURE</span>' : ''}</span>
-        <button id="next-week" aria-label="Next week" ${atCap ? 'disabled style="opacity:0.3"' : ''}>&#8250;</button>
-      </div>
+        <button id="next-week" aria-label="Next week" ${isCurrentWeek ? 'disabled style="opacity:0.3"' : ''}>&#8250;</button>
+      </div>` : ''}
     </header>
   `;
 }
@@ -207,10 +205,47 @@ function buildDashboard() {
     dateStr = 'WK ' + isoWeekOf(wkStart) + ' · ' + fmt(wkStart) + ' – ' + fmt(wkEnd);
   }
 
+  // ── Pace line for Today card ──
+  let paceLine = '';
+  if (isCurrentWeek && !dayIsLeave(week, todayKey) && dailyTargetHours > 0) {
+    const _cur = new Date().getHours() * 60 + new Date().getMinutes();
+    const _sh  = (week.shifts || {})[todayKey] || {};
+    let _startM = 480, _endM = 990;
+    if (_sh.start && _sh.end) {
+      const [sh, sm] = _sh.start.split(':').map(Number);
+      const [eh, em] = _sh.end.split(':').map(Number);
+      _startM = sh * 60 + sm; _endM = eh * 60 + em;
+    }
+    const _worked  = Math.max(0, _cur - _startM);
+    const _remain  = Math.max(0, _endM - _cur);
+    const _remStr  = _remain >= 60
+      ? `${Math.floor(_remain / 60)}h ${String(_remain % 60).padStart(2, '0')}m left`
+      : `${_remain}m left`;
+    if (_cur >= _endM) {
+      const _g = todayHours - dailyTargetHours;
+      paceLine = `<div class="split-pace ${_g >= 0 ? 'pace-green' : 'pace-red'}">${_g >= 0 ? 'Shift complete · target hit ✓' : 'Shift complete · below target'}</div>`;
+    } else if (_cur < _startM) {
+      const _m = _startM - _cur;
+      paceLine = `<div class="split-pace pace-muted">Starts in ${_m >= 60 ? Math.floor(_m/60)+'h '+_m%60+'m' : _m+'m'}</div>`;
+    } else if (todayHours > 0 && _worked >= 15) {
+      const _proj = todayHours + (todayHours / _worked) * _remain;
+      const _gap  = _proj - dailyTargetHours;
+      if (_gap >= 0) {
+        paceLine = `<div class="split-pace pace-green">On pace · ${_remStr}</div>`;
+      } else {
+        const _n = Math.ceil(Math.abs(_gap) / (56 / 60));
+        paceLine = `<div class="split-pace pace-red">${_n} job${_n === 1 ? '' : 's'} to catch up · ${_remStr}</div>`;
+      }
+    } else if (_remain > 0) {
+      paceLine = `<div class="split-pace pace-muted">${_remStr}</div>`;
+    }
+  }
+
   return `
     ${isCurrentWeek ? `<div class="dash-greeting" id="greeting-text" data-greeting="${greeting}">${greetDisplay}</div>` : ''}
     ${dateStr ? `<div class="date-header">${dateStr}</div>` : ''}
-    ${buildTickerStrip()}
+    ${week.note ? `<div class="dash-note">${week.note}</div>` : ''}
+    <div id="ticker-wrap">${buildTickerStrip()}</div>
 
     <div class="ctap-hero-card">
       <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
@@ -236,6 +271,7 @@ function buildDashboard() {
         </div>
         <div class="split-hours ${dayColour}">${todayHours.toFixed(2)}<span class="split-unit">h</span></div>
         <div class="split-sub">of ${dailyTargetHours.toFixed(1)}h target</div>
+        ${paceLine}
         <div class="progress-bar" style="margin-top:auto">
           <div class="progress-bar-fill ${dayColour}" style="width:${dayPct.toFixed(1)}%"></div>
         </div>
@@ -250,7 +286,6 @@ function buildDashboard() {
         <div class="week-chart">${weekBarsHTML}</div>
       </div>
     </div>
-
 
     <details class="insights-details"${hasAny ? ' open' : ''}>
       <summary class="insights-summary">
@@ -339,12 +374,18 @@ function buildSchedule() {
 
   const todayWk = getWeekKey(new Date());
   const isFuture = currentWeekKey > todayWk;
+  const maxFutureSched = new Date(); maxFutureSched.setDate(maxFutureSched.getDate() + 56);
+  const schedAtCap = currentWeekKey >= getWeekKey(maxFutureSched);
 
   return `
     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
       <div>
         <div style="font-size:0.9rem;font-weight:700">Week Schedule</div>
-        <div style="font-size:0.72rem;color:var(--muted);margin-top:2px">${weekLabel(currentWeekKey)}</div>
+        <div style="display:flex;align-items:center;gap:4px;margin-top:4px">
+          <button id="sched-prev-week" class="inline-week-btn">&#8249;</button>
+          <span style="font-size:0.72rem;color:var(--muted)">${weekLabel(currentWeekKey)}</span>
+          <button id="sched-next-week" class="inline-week-btn" ${schedAtCap ? 'disabled' : ''}>&#8250;</button>
+        </div>
       </div>
       <button id="apply-default" style="background:var(--surface2);border:none;color:var(--accent);border-radius:8px;padding:6px 12px;font-size:0.75rem;font-weight:600;cursor:pointer">Standard week</button>
     </div>
@@ -356,6 +397,12 @@ function buildSchedule() {
     </div>
     <button id="save-shifts" style="width:100%;margin-top:8px;background:var(--accent);color:var(--jcpd-accent-ink);border:none;border-radius:12px;padding:10px;font-size:0.92rem;font-weight:700;cursor:pointer;letter-spacing:-0.2px">Save Schedule</button>
     <p style="font-size:0.7rem;color:var(--muted);text-align:center;margin-top:6px">Lunch is deducted from your daily target hours</p>
+    <div class="week-note-wrap">
+      <label class="week-note-label">Week note</label>
+      <textarea id="week-note" class="week-note-input" rows="2"
+        placeholder="e.g. Training Monday, van in Wednesday…">${(week.note || '').replace(/</g, '&lt;')}</textarea>
+      <p class="week-note-hint">Saves automatically</p>
+    </div>
   `;
 }
 
@@ -648,7 +695,6 @@ function buildTickerStrip() {
   const week     = state.weeks[todayWk] || { days: {}, shifts: {} };
   const items    = [];
 
-  // ISO week number helper (same as in buildDashboard)
   const isoWkNum = (function() {
     const d = new Date(); d.setHours(0,0,0,0);
     const dow = d.getDay();
@@ -657,59 +703,88 @@ function buildTickerStrip() {
     return 1 + Math.round(((thu - w1) / 86400000 - 3 + (w1.getDay() + 6) % 7) / 7);
   })();
 
-  // ── WK number + bonus status ──
   const earned  = weekCreditHours(week);
   const target  = adjustedTargetHours(state, week);
   const bonus   = bonusAchieved(state, week);
   const pct     = target > 0 ? (earned / target) * 100 : 0;
-  const bonusTxt = bonus ? 'Bonus ✓' : pct >= 80 ? 'On track' : 'Behind target';
+  const wkDays  = weekDays(todayWk);
+
+  // ── 1. Daily target status (most actionable) ──
+  const todayJobs   = (week.days || {})[todayKey] || [];
+  const todayH      = todayJobs.reduce((s, j) => s + j.creditMins, 0) / 60;
+  const dailyT      = getDailyTarget(state, week, todayKey);
+  if (dailyT > 0) {
+    if (todayH >= dailyT) {
+      const over = todayH - dailyT;
+      items.push(`Daily target hit ✓${over >= 0.05 ? ' · +' + over.toFixed(2) + 'h over' : ''}`);
+    } else {
+      const gap        = dailyT - todayH;
+      const jobsNeeded = Math.ceil(gap / (56 / 60));
+      items.push(`${jobsNeeded} more job${jobsNeeded === 1 ? '' : 's'} to hit daily target`);
+    }
+  }
+
+  // ── 2. Time since last logged job ──
+  const allFlat = Object.values(week.days || {}).flat().filter(j => j.ts);
+  if (allFlat.length > 0) {
+    const lastJob  = allFlat.reduce((a, b) => b.ts > a.ts ? b : a);
+    const minsAgo  = Math.round((Date.now() - lastJob.ts) / 60000);
+    if (minsAgo < 600) {
+      const shortName = lastJob.name.replace(/\s*[\(\–\-].*$/, '').trim();
+      const timeStr   = minsAgo < 60
+        ? `${minsAgo}m ago`
+        : `${Math.floor(minsAgo / 60)}h ${String(minsAgo % 60).padStart(2, '0')}m ago`;
+      items.push(`Last: ${shortName} · ${timeStr}`);
+    }
+  }
+
+  // ── 3. WK number + weekly status ──
+  const bonusTxt = bonus ? 'Bonus ✓' : pct >= 80 ? 'On track' : 'Behind';
   items.push(`WK ${isoWkNum} · ${bonusTxt}`);
 
-  // ── CTAP balance ──
+  // ── 4. Hours/jobs to weekly bonus ──
+  if (!bonus && target > 0) {
+    const needed   = target - earned;
+    const bdjobs   = Math.ceil(needed / (56 / 60));
+    items.push(`${needed.toFixed(1)}h to bonus · ~${bdjobs} jobs`);
+  }
+
+  // ── 5. CTAP balance ──
   const bal = cumulativeBalance(state);
   if (Math.abs(bal) >= 0.01) {
-    items.push(`CTAP ${bal >= 0 ? '+' : ''}${bal.toFixed(2)}h`);
+    items.push(`CTAP ${bal >= 0 ? '+' : ''}${bal.toFixed(2)}h${bal >= 0 ? ' in credit' : ' deficit'}`);
   }
 
-  // ── Best day this week ──
-  const wkDays   = weekDays(todayWk);
-  const DAY_ABB  = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
-  let bestDayH = 0, bestDayN = '';
-  wkDays.forEach((dk, i) => {
-    const dh = ((week.days || {})[dk] || []).reduce((s, j) => s + j.creditMins, 0) / 60;
-    if (dh > bestDayH) { bestDayH = dh; bestDayN = DAY_ABB[i]; }
-  });
-  if (bestDayH > 0) {
-    items.push(`Best day: ${bestDayN} · ${bestDayH.toFixed(2)}h`);
+  // ── 6. Days left in working week ──
+  const dayOfWk  = (new Date().getDay() + 6) % 7; // 0=Mon … 4=Fri
+  const daysLeft = Math.max(0, 4 - dayOfWk);
+  if (daysLeft === 0 && dayOfWk === 4) {
+    items.push('Friday · Last chance for bonus');
+  } else if (daysLeft > 0) {
+    items.push(`${daysLeft} working day${daysLeft === 1 ? '' : 's'} left this week`);
   }
 
-  // ── Jobs logged today ──
-  const todayJobs = (week.days || {})[todayKey] || [];
-  if (todayJobs.length > 0) {
-    items.push(`${todayJobs.length} job${todayJobs.length === 1 ? '' : 's'} logged today`);
-  }
-
-  // ── Last week result ──
+  // ── 7. Last week result ──
   const prevDate = new Date(); prevDate.setDate(prevDate.getDate() - 7);
   const prevWk   = state.weeks[getWeekKey(prevDate)];
   if (prevWk) {
     const prevGap = weekCreditHours(prevWk) - adjustedTargetHours(state, prevWk);
     items.push(prevGap >= 0
-      ? `Last week: hit by +${prevGap.toFixed(2)}h`
-      : `Last week: short by ${Math.abs(prevGap).toFixed(2)}h`);
+      ? `Last week: +${prevGap.toFixed(2)}h above target`
+      : `Last week: ${Math.abs(prevGap).toFixed(2)}h short`);
   }
 
-  // ── Hive installs this week ──
+  // ── 8. Hive installs this week ──
   const hiveIds = new Set(JOB_TYPES.hive.map(j => j.id));
   let hiveCount = 0;
   Object.values(week.days || {}).forEach(dayJobs => {
     dayJobs.forEach(j => { if (hiveIds.has(j.id)) hiveCount++; });
   });
   if (hiveCount > 0) {
-    items.push(`Hive: ${hiveCount} install${hiveCount === 1 ? '' : 's'} this week`);
+    items.push(`${hiveCount} Hive install${hiveCount === 1 ? '' : 's'} this week`);
   }
 
-  // ── Consecutive days hitting daily target ──
+  // ── 9. Daily target streak ──
   let streak = 0;
   for (const dk of wkDays.slice(0, 5)) {
     if (dk > todayKey) break;
@@ -719,17 +794,14 @@ function buildTickerStrip() {
     const dh = ((week.days || {})[dk] || []).reduce((s, j) => s + j.creditMins, 0) / 60;
     if (dh >= dt) { streak++; } else { streak = 0; }
   }
-  if (streak >= 2) {
-    items.push(`${streak} days hitting daily target`);
-  }
+  if (streak >= 2) items.push(`${streak} days hitting daily target`);
 
   if (items.length === 0) return '';
 
   const sep      = '<span class="ticker-sep">·</span>';
   const itemsHTML = items.map(t => `<span class="ticker-item">${t}</span>`).join(sep);
-  // Duplicate for seamless loop — animation moves -50% (= one full copy width)
   const track    = itemsHTML + sep + itemsHTML + sep;
-  const duration = Math.max(18, items.length * 5);
+  const duration = Math.max(20, items.length * 6);
 
   return `
     <div class="ticker-strip">
@@ -737,6 +809,11 @@ function buildTickerStrip() {
         ${track}
       </div>
     </div>`;
+}
+
+function refreshTicker() {
+  const wrap = document.getElementById('ticker-wrap');
+  if (wrap) wrap.innerHTML = buildTickerStrip();
 }
 
 function buildDayBlock(dayKey, jobs, isToday, week) {
@@ -769,33 +846,120 @@ function buildDayBlock(dayKey, jobs, isToday, week) {
   `;
 }
 
+// ── Recent jobs helper ─────────────────────────────────────────────────────
+function getRecentJobs(n) {
+  const seen = new Set();
+  const result = [];
+  const entries = [];
+  Object.values(state.weeks).forEach(week => {
+    Object.values(week.days || {}).forEach(dayJobs => {
+      dayJobs.forEach(j => { if (j.id && j.ts) entries.push(j); });
+    });
+  });
+  entries.sort((a, b) => b.ts - a.ts);
+  for (const entry of entries) {
+    if (seen.has(entry.id)) continue;
+    const job = findJob(entry.id);
+    if (!job || job.isNpt) continue;
+    seen.add(entry.id);
+    result.push(job);
+    if (result.length >= n) break;
+  }
+  return result;
+}
+
 // ── Log Jobs ───────────────────────────────────────────────────────────────
 function buildLogJobs() {
   const jobs = JOB_TYPES[activeJobTab];
-
-  // Session stats from today's jobs in the current real week
   const todayKey = getTodayKey();
-  const wkKey = getWeekKey(new Date());
+  const isLoggingToday = activeLogDay === todayKey;
+
+  // Day picker
+  const logDayDate = new Date(activeLogDay + 'T00:00:00');
+  const logDayLabel = isLoggingToday
+    ? 'Today · ' + logDayDate.toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short' })
+    : logDayDate.toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'short' });
+  const minLogDate = new Date(); minLogDate.setDate(minLogDate.getDate() - 13);
+  const atMin = activeLogDay <= localDateStr(minLogDate);
+  const dayPickerHTML = `
+    <div class="day-picker">
+      <button id="log-prev-day" class="day-picker-btn" ${atMin ? 'disabled' : ''}>&#8249;</button>
+      <span class="day-picker-label${isLoggingToday ? ' today' : ''}">${logDayLabel}</span>
+      <button id="log-next-day" class="day-picker-btn" ${isLoggingToday ? 'disabled' : ''}>&#8250;</button>
+    </div>`;
+
+  // Session stats for the selected day
+  const wkKey = getWeekKey(new Date(activeLogDay + 'T00:00:00'));
   const wk = state.weeks[wkKey] || { days: {} };
-  const todayJobs = (wk.days || {})[todayKey] || [];
-  const sessionHours = todayJobs.reduce((s, j) => s + j.creditMins, 0) / 60;
-  const firstTs = todayJobs.length > 0 ? Math.min(...todayJobs.map(j => j.ts || Date.now())) : null;
-  const sinceStr = firstTs
+  const dayJobs = (wk.days || {})[activeLogDay] || [];
+  const sessionHours = dayJobs.reduce((s, j) => s + j.creditMins, 0) / 60;
+  const firstTs = dayJobs.length > 0 ? Math.min(...dayJobs.map(j => j.ts || Date.now())) : null;
+  const sinceStr = isLoggingToday && firstTs
     ? new Date(firstTs).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })
     : null;
 
-  const sessionBarHTML = todayJobs.length > 0 ? `
+  const sessionBarHTML = dayJobs.length > 0 ? `
     <div class="session-bar">
-      <span>${todayJobs.length} job${todayJobs.length === 1 ? '' : 's'}</span>
+      <span>${dayJobs.length} job${dayJobs.length === 1 ? '' : 's'}</span>
       ${sinceStr ? `<span>· since ${sinceStr}</span>` : ''}
       <span class="session-val">· +${sessionHours.toFixed(2)}h</span>
     </div>` : '';
 
+  // Recently used jobs
+  const recentJobs = getRecentJobs(4);
+  const recentBarHTML = recentJobs.length > 0 ? `
+    <div class="recent-bar">
+      <span class="recent-label">Recent</span>
+      <div class="recent-jobs">
+        ${recentJobs.map(j => `
+          <button class="recent-job-btn${j.variable ? ' variable' : ''}" data-job-id="${j.id}">
+            <span class="rj-name">${j.name.replace(/\s*[\(\–\-].*$/, '').trim()}</span>
+            <span class="rj-credits">${j.variable ? 'Variable' : `+${(j.minutes / 60).toFixed(2)}h`}</span>
+          </button>`).join('')}
+      </div>
+    </div>` : '';
+
+  const searchHTML = `
+    <div class="search-wrap">
+      <span class="search-icon">&#9906;</span>
+      <input type="search" id="job-search" class="job-search-input"
+        placeholder="Search jobs…" value="${jobSearch}"
+        autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false">
+      ${jobSearch ? `<button id="search-clear" class="search-clear-btn">&#10005;</button>` : ''}
+    </div>`;
+
+  // Search active — filter across all categories, hide tabs and recent bar
+  if (jobSearch.trim()) {
+    const q = jobSearch.trim().toLowerCase();
+    const allJobs = [
+      ...JOB_TYPES.core,
+      ...JOB_TYPES.hive,
+      ...JOB_TYPES.sales,
+      ...JOB_TYPES.absent
+    ];
+    const filtered = allJobs.filter(j =>
+      j.name.toLowerCase().includes(q) ||
+      (j.code && j.code.toLowerCase().includes(q))
+    );
+    const gridHTML = filtered.length > 0
+      ? filtered.map(j => `<button class="job-btn${j.variable ? ' variable' : ''}" data-job-id="${j.id}">
+          ${j.code ? `<span class="jb-code">${j.code}</span>` : ''}
+          <span class="jb-name">${j.name}</span>
+          <span class="jb-credits">${j.variable ? 'Variable' : `+${(j.minutes / 60).toFixed(2)}h`}</span>
+        </button>`).join('')
+      : `<div style="grid-column:1/-1;text-align:center;padding:24px 0;font-size:0.82rem;color:var(--muted)">No jobs match "${jobSearch}"</div>`;
+    return `
+      ${dayPickerHTML}
+      ${searchHTML}
+      <div class="job-grid">${gridHTML}</div>
+      ${sessionBarHTML}
+    `;
+  }
+
   return `
-    <div class="log-header">
-      <div class="log-title">Quick Log</div>
-      <div class="log-sub">Tap a job tile to log it.</div>
-    </div>
+    ${dayPickerHTML}
+    ${searchHTML}
+    ${recentBarHTML}
     <div class="tab-bar">
       <button class="${activeJobTab === 'core' ? 'active' : ''}" data-jobtab="core">Core</button>
       <button class="${activeJobTab === 'hive' ? 'active' : ''}" data-jobtab="hive">Hive</button>
@@ -806,7 +970,7 @@ function buildLogJobs() {
       ${jobs.map(j => `<button class="job-btn${j.variable ? ' variable' : ''}" data-job-id="${j.id}">
           ${j.code ? `<span class="jb-code">${j.code}</span>` : ''}
           <span class="jb-name">${j.name}</span>
-          <span class="jb-credits">${j.variable ? 'Variable' : `${j.credits} cr`}</span>
+          <span class="jb-credits">${j.variable ? 'Variable' : `+${(j.minutes / 60).toFixed(2)}h`}</span>
         </button>`).join('')}
     </div>
     ${sessionBarHTML}
@@ -818,26 +982,67 @@ function buildHistory() {
   const currentWk = getWeekKey(new Date());
   const weeks = Object.keys(state.weeks).filter(wk => wk <= currentWk).sort().reverse();
   if (weeks.length === 0) return '<div class="empty">No history yet</div>';
-  return weeks.map(wk => {
+
+  // ── Trend chart ──
+  const isoWkNum = wk => {
+    const d = new Date(wk + 'T00:00:00');
+    const dow = d.getDay();
+    const thu = new Date(d); thu.setDate(d.getDate() + 3 - (dow + 6) % 7);
+    const w1 = new Date(thu.getFullYear(), 0, 4);
+    return 1 + Math.round(((thu - w1) / 86400000 - 3 + (w1.getDay() + 6) % 7) / 7);
+  };
+
+  const chartWeeks = weeks.filter(wk => wk < currentWk).slice(0, 8).reverse();
+  let trendHTML = '';
+  if (chartWeeks.length >= 1) {
+    const hitCount = chartWeeks.filter(wk => bonusAchieved(state, state.weeks[wk])).length;
+    const cols = chartWeeks.map(wk => {
+      const week = state.weeks[wk];
+      const earned = weekCreditHours(week);
+      const target = adjustedTargetHours(state, week);
+      const pct    = target > 0 ? (earned / target) * 100 : (earned > 0 ? 100 : 0);
+      const colour = pct >= 100 ? 'green' : pct >= 80 ? 'amber' : earned === 0 ? 'grey' : 'red';
+      return `
+        <div class="trend-col" data-goto-week="${wk}" style="cursor:pointer">
+          <div class="trend-track">
+            <div class="trend-fill ${colour}" style="height:${Math.min(pct, 100).toFixed(0)}%"></div>
+          </div>
+          <div class="trend-wk-label">W${isoWkNum(wk)}</div>
+        </div>`;
+    }).join('');
+    trendHTML = `
+      <div class="trend-chart-wrap">
+        <div class="trend-header">
+          <span class="trend-title">Weekly trend</span>
+          <span class="trend-stat">${hitCount} / ${chartWeeks.length} weeks bonus</span>
+        </div>
+        <div class="trend-chart">${cols}</div>
+      </div>`;
+  }
+
+  const list = weeks.map(wk => {
     const week = state.weeks[wk];
     const earned = weekCreditHours(week);
     const target = adjustedTargetHours(state, week);
-    const pct = target > 0 ? (earned / target) * 100 : 0;
-    const bonus = bonusAchieved(state, week);
+    const pct    = target > 0 ? (earned / target) * 100 : 0;
+    const bonus  = bonusAchieved(state, week);
     const colour = pct >= 100 ? 'green' : pct >= 80 ? 'amber' : earned === 0 ? 'grey' : 'red';
     const isCurrent = wk === currentWeekKey;
-    const isPast = wk < currentWk;
-    const excluded = week.excludeFromCtap || false;
+    const isPast    = wk < currentWk;
+    const excluded  = week.excludeFromCtap || false;
     return `
       <div class="history-item" data-goto-week="${wk}">
         <div class="hi-left">
           <div class="hi-week">${weekLabel(wk)}${isCurrent ? ' (current)' : ''}</div>
           <div class="hi-credits">${earned.toFixed(2)}h / ${target.toFixed(2)}h target — ${bonus ? 'Bonus ✓' : pct >= 80 ? 'Close' : 'Below target'}</div>
+          ${week.note ? `<div class="hi-note">${week.note}</div>` : ''}
           ${isPast ? `<button class="ctap-toggle-btn${excluded ? ' excluded' : ''}" data-week-key="${wk}">${excluded ? '✕ Excluded from CTAP' : '✓ In CTAP'}</button>` : ''}
         </div>
         <div class="history-dot ${colour}"></div>
       </div>`;
   }).join('');
+
+  return trendHTML + list;
 }
 
 // ── Settings ───────────────────────────────────────────────────────────────
@@ -1337,12 +1542,24 @@ function attachListeners() {
     }
   }
 
+  // Auto-refresh ticker every 60 seconds while on dashboard
+  clearInterval(window._tickerTimer);
+  if (activeTab === 'dashboard') {
+    window._tickerTimer = setInterval(refreshTicker, 60000);
+  }
+
   // Bottom nav
   document.querySelectorAll('[data-tab]').forEach(btn => {
-    btn.addEventListener('click', () => { weekSummaryKey = null; activeTab = btn.dataset.tab; render(); });
+    btn.addEventListener('click', () => {
+      weekSummaryKey = null;
+      activeTab = btn.dataset.tab;
+      if (activeTab === 'dashboard') currentWeekKey = getWeekKey(new Date());
+      if (activeTab === 'log') { activeLogDay = getTodayKey(); jobSearch = ''; }
+      render();
+    });
   });
 
-  // Week navigation
+  // Dashboard week navigation
   const prevBtn = document.getElementById('prev-week');
   const nextBtn = document.getElementById('next-week');
   if (prevBtn) prevBtn.addEventListener('click', () => {
@@ -1357,14 +1574,71 @@ function attachListeners() {
     const d = new Date(currentWeekKey + 'T00:00:00');
     d.setDate(d.getDate() + 7);
     const newKey = getWeekKey(d);
-    const todayWk = getWeekKey(new Date());
-    if (activeTab === 'schedule') {
-      const maxFuture = new Date(); maxFuture.setDate(maxFuture.getDate() + 56);
-      if (newKey <= getWeekKey(maxFuture)) { currentWeekKey = newKey; render(); }
-    } else {
-      if (newKey <= todayWk) { currentWeekKey = newKey; render(); }
-    }
+    if (newKey <= getWeekKey(new Date())) { currentWeekKey = newKey; render(); }
   });
+
+  // Week note auto-save
+  const weekNoteEl = document.getElementById('week-note');
+  if (weekNoteEl) {
+    weekNoteEl.addEventListener('blur', () => {
+      const wk = getOrCreateWeek(state, currentWeekKey);
+      const val = weekNoteEl.value.trim();
+      if (val) { wk.note = val; } else { delete wk.note; }
+      saveState(state);
+    });
+  }
+
+  // Schedule inline week navigation
+  const schedPrev = document.getElementById('sched-prev-week');
+  const schedNext = document.getElementById('sched-next-week');
+  if (schedPrev) schedPrev.addEventListener('click', () => {
+    const d = new Date(currentWeekKey + 'T00:00:00');
+    d.setDate(d.getDate() - 7);
+    currentWeekKey = getWeekKey(d);
+    render();
+  });
+  if (schedNext) schedNext.addEventListener('click', () => {
+    const d = new Date(currentWeekKey + 'T00:00:00');
+    d.setDate(d.getDate() + 7);
+    const newKey = getWeekKey(d);
+    const maxFuture = new Date(); maxFuture.setDate(maxFuture.getDate() + 56);
+    if (newKey <= getWeekKey(maxFuture)) { currentWeekKey = newKey; render(); }
+  });
+
+  // Log Job day picker
+  const logPrevDay = document.getElementById('log-prev-day');
+  const logNextDay = document.getElementById('log-next-day');
+  if (logPrevDay) logPrevDay.addEventListener('click', () => {
+    const d = new Date(activeLogDay + 'T00:00:00');
+    d.setDate(d.getDate() - 1);
+    const minDate = new Date(); minDate.setDate(minDate.getDate() - 13);
+    const newKey = localDateStr(d);
+    if (newKey >= localDateStr(minDate)) { activeLogDay = newKey; render(); }
+  });
+  if (logNextDay) logNextDay.addEventListener('click', () => {
+    const d = new Date(activeLogDay + 'T00:00:00');
+    d.setDate(d.getDate() + 1);
+    const newKey = localDateStr(d);
+    if (newKey <= getTodayKey()) { activeLogDay = newKey; render(); }
+  });
+
+  // Job search
+  const searchInput = document.getElementById('job-search');
+  const searchClear = document.getElementById('search-clear');
+  if (searchInput) {
+    searchInput.addEventListener('input', () => {
+      jobSearch = searchInput.value;
+      render();
+      const fresh = document.getElementById('job-search');
+      if (fresh) { fresh.focus(); fresh.setSelectionRange(fresh.value.length, fresh.value.length); }
+    });
+  }
+  if (searchClear) {
+    searchClear.addEventListener('click', () => {
+      jobSearch = '';
+      render();
+    });
+  }
 
   // Job category tabs
   document.querySelectorAll('[data-jobtab]').forEach(btn => {
@@ -1624,11 +1898,11 @@ function closeModal() {
 }
 
 function logJob(job, variableValue, optionalName) {
-  const todayKey = getTodayKey();
-  // Only allow logging to current week's today
-  const weekOfToday = getWeekKey(new Date());
-  if (currentWeekKey !== weekOfToday) {
-    showToast('Switch to current week to log jobs');
+  const targetDay = activeLogDay;
+  const targetWeekKey = getWeekKey(new Date(targetDay + 'T00:00:00'));
+
+  if (targetDay > getTodayKey()) {
+    showToast('Cannot log to a future date');
     return;
   }
 
@@ -1637,9 +1911,9 @@ function logJob(job, variableValue, optionalName) {
     const mins = Math.round(variableValue);
     if (!mins || mins <= 0) return;
     const label = optionalName || 'Non-Productive Time';
-    const week = getOrCreateWeek(state, currentWeekKey);
+    const week = getOrCreateWeek(state, targetWeekKey);
     if (!week.deductionLog) week.deductionLog = [];
-    week.deductionLog.push({ name: label, mins, date: todayKey });
+    week.deductionLog.push({ name: label, mins, date: targetDay });
     week.deductionMins = (week.deductionMins || 0) + mins;
     saveState(state);
     showToast('NPT added — ' + mins + ' min');
@@ -1652,12 +1926,10 @@ function logJob(job, variableValue, optionalName) {
 
   if (job.variable && variableValue !== null) {
     if (job.variableType === 'hours') {
-      // Upgrade Work: credits per hour quoted × number of hours
       creditMins = job.minutes * variableValue;
       variableDisplay = `${variableValue}h`;
     } else {
-      // Trace & Repair / INSHV-TRV: credits = minutes / 83.58
-      creditMins = variableValue; // store as minutes, 1 credit/min
+      creditMins = variableValue;
       variableDisplay = `${variableValue}min`;
     }
   } else {
@@ -1672,13 +1944,14 @@ function logJob(job, variableValue, optionalName) {
     ts: Date.now()
   };
 
-  const week = getOrCreateWeek(state, currentWeekKey);
-  const day = getOrCreateDay(week, todayKey);
+  const week = getOrCreateWeek(state, targetWeekKey);
+  const day = getOrCreateDay(week, targetDay);
   day.push(entry);
   saveState(state);
 
   const displayName = job.name.replace(/\s*\(.*$/, '');
-  showToast(displayName + ' added');
+  const backfillNote = targetDay !== getTodayKey() ? ' (backdated)' : '';
+  showToast(displayName + ' added' + backfillNote);
   if (activeTab === 'log') {
     // Stay on log tab, just show toast
   } else {

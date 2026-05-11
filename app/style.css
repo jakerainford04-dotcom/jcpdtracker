@@ -569,6 +569,131 @@ body {
 }
 .settings-note { font-size: 0.73rem; color: var(--muted); margin-top: 8px; line-height: 1.5; }
 
+/* ── Week note ── */
+.week-note-wrap {
+  background: var(--surface);
+  border: 1px solid var(--tile-border);
+  border-radius: var(--radius);
+  padding: 12px 14px 8px;
+  margin-top: 10px;
+}
+.week-note-label {
+  display: block;
+  font-size: 0.58rem;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--muted);
+  margin-bottom: 6px;
+}
+.week-note-input {
+  width: 100%;
+  box-sizing: border-box;
+  background: transparent;
+  border: none;
+  outline: none;
+  font-size: 0.84rem;
+  font-family: inherit;
+  color: var(--fg);
+  resize: none;
+  line-height: 1.5;
+}
+.week-note-input::placeholder { color: var(--muted); font-style: italic; }
+.week-note-hint {
+  font-size: 0.62rem;
+  color: var(--muted);
+  margin: 4px 0 0;
+  text-align: right;
+}
+.dash-note {
+  font-size: 0.76rem;
+  color: var(--muted);
+  font-style: italic;
+  margin-bottom: 8px;
+  padding: 0 2px;
+}
+.hi-note {
+  font-size: 0.72rem;
+  color: var(--muted);
+  font-style: italic;
+  margin-top: 3px;
+}
+
+/* ── History trend chart ── */
+.trend-chart-wrap {
+  background: var(--surface);
+  border: 1px solid var(--tile-border);
+  border-radius: var(--radius);
+  padding: 14px 14px 10px;
+  margin-bottom: 12px;
+}
+.trend-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 10px;
+}
+.trend-title {
+  font-size: 0.58rem;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+.trend-stat {
+  font-size: 0.66rem;
+  font-weight: 600;
+  color: var(--muted);
+}
+.trend-chart {
+  display: flex;
+  align-items: flex-end;
+  gap: 5px;
+  height: 72px;
+}
+.trend-col {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  height: 100%;
+  gap: 4px;
+}
+.trend-track {
+  flex: 1;
+  width: 100%;
+  background: var(--surface2);
+  border-radius: 4px;
+  position: relative;
+  display: flex;
+  align-items: flex-end;
+  overflow: hidden;
+}
+.trend-track::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 1.5px;
+  background: var(--sep);
+}
+.trend-fill {
+  width: 100%;
+  border-radius: 3px 3px 0 0;
+  min-height: 3px;
+}
+.trend-fill.green { background: var(--green); }
+.trend-fill.amber { background: var(--amber); }
+.trend-fill.red   { background: var(--red); }
+.trend-fill.grey  { background: var(--sep); }
+.trend-wk-label {
+  font-size: 0.58rem;
+  font-weight: 600;
+  color: var(--muted);
+  white-space: nowrap;
+}
+
 /* ── History ── */
 .history-item {
   background: var(--surface);
@@ -1049,22 +1174,169 @@ details[open] .info-chevron { transform: rotate(90deg); }
   justify-content: center;
 }
 
-/* ── Log tab header ── */
-.log-header { margin-bottom: 10px; }
-.log-title {
-  font-size: 0.58rem;
-  font-weight: 700;
-  letter-spacing: 0.14em;
-  color: var(--muted);
-  text-transform: uppercase;
+/* ── Day picker (Log Job) ── */
+.day-picker {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  background: var(--surface2);
+  border-radius: 12px;
+  padding: 10px 14px;
+  margin-bottom: 10px;
 }
-.log-sub {
+.day-picker-btn {
+  background: var(--surface);
+  border: none;
+  color: var(--fg);
+  font-size: 1.3rem;
+  line-height: 1;
+  border-radius: 8px;
+  width: 32px;
+  height: 32px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.day-picker-btn:disabled { opacity: 0.3; cursor: default; }
+.day-picker-label {
   font-size: 0.88rem;
   font-weight: 600;
-  color: var(--text);
-  margin-top: 2px;
-  letter-spacing: -0.2px;
+  color: var(--muted);
+  text-align: center;
 }
+.day-picker-label.today { color: var(--accent); }
+
+/* ── Job search ── */
+.search-wrap {
+  position: relative;
+  display: flex;
+  align-items: center;
+  margin-bottom: 10px;
+}
+.search-icon {
+  position: absolute;
+  left: 11px;
+  font-size: 0.9rem;
+  color: var(--muted);
+  pointer-events: none;
+  line-height: 1;
+}
+.job-search-input {
+  width: 100%;
+  box-sizing: border-box;
+  background: var(--surface2);
+  border: 1.5px solid var(--tile-border);
+  border-radius: 10px;
+  padding: 9px 36px 9px 30px;
+  font-size: 0.86rem;
+  font-family: inherit;
+  color: var(--fg);
+  outline: none;
+  -webkit-appearance: none;
+  appearance: none;
+}
+.job-search-input::placeholder { color: var(--muted); }
+.job-search-input:focus { border-color: var(--accent); }
+.job-search-input::-webkit-search-cancel-button { display: none; }
+.search-clear-btn {
+  position: absolute;
+  right: 8px;
+  background: none;
+  border: none;
+  color: var(--muted);
+  font-size: 0.9rem;
+  cursor: pointer;
+  padding: 4px 6px;
+  line-height: 1;
+  border-radius: 4px;
+}
+.search-clear-btn:active { opacity: 0.6; }
+
+/* ── Recent jobs bar ── */
+.recent-bar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 10px;
+}
+.recent-label {
+  font-size: 0.58rem;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  color: var(--muted);
+  text-transform: uppercase;
+  flex-shrink: 0;
+}
+.recent-jobs {
+  display: flex;
+  gap: 6px;
+  overflow-x: auto;
+  flex: 1;
+  padding-bottom: 2px;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: none;
+}
+.recent-jobs::-webkit-scrollbar { display: none; }
+.recent-job-btn {
+  flex-shrink: 0;
+  background: var(--surface2);
+  border: 1.5px solid var(--tile-border);
+  border-radius: 10px;
+  padding: 8px 12px;
+  cursor: pointer;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 3px;
+  min-width: 90px;
+  text-align: left;
+}
+.recent-job-btn:active { opacity: 0.7; }
+.recent-job-btn.variable { border-style: dashed; border-color: var(--amber); }
+.recent-job-btn.logged { background: var(--accent); border-color: var(--accent); }
+.recent-job-btn.logged .rj-name,
+.recent-job-btn.logged .rj-credits { color: var(--jcpd-accent-ink); }
+.rj-name {
+  font-size: 0.76rem;
+  font-weight: 600;
+  color: var(--fg);
+  line-height: 1.2;
+}
+.rj-credits {
+  font-size: 0.68rem;
+  color: var(--accent);
+  font-weight: 700;
+}
+.recent-job-btn.variable .rj-credits { color: var(--amber); }
+
+/* ── Schedule inline week nav ── */
+.inline-week-btn {
+  background: var(--surface);
+  border: none;
+  color: var(--fg);
+  font-size: 1.1rem;
+  line-height: 1;
+  border-radius: 6px;
+  width: 26px;
+  height: 26px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.inline-week-btn:disabled { opacity: 0.3; cursor: default; }
+
+/* ── Pace line (inside Today split card) ── */
+.split-pace {
+  font-size: 0.66rem;
+  font-weight: 600;
+  margin-bottom: 4px;
+  line-height: 1.3;
+}
+.split-pace.pace-green { color: var(--green); }
+.split-pace.pace-red   { color: var(--red); }
+.split-pace.pace-muted { color: var(--muted); }
 
 /* ── Session bar ── */
 .session-bar {
