@@ -2116,12 +2116,17 @@ details[open] .info-chevron { transform: rotate(90deg); }
   flex-shrink: 0;
   margin-top: 2px;
   cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
 }
 .coach-slider-wrap input {
   opacity: 0;
   width: 0;
   height: 0;
   position: absolute;
+  pointer-events: none;
+}
+.coach-slider-wrap input:focus + .coach-slider {
+  outline: none;
 }
 .coach-slider {
   position: absolute;
