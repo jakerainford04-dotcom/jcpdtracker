@@ -390,7 +390,8 @@ body {
 .job-entry:last-child { border-bottom: none; }
 .job-entry .job-name    { color: var(--text); flex: 1; padding-right: 8px; line-height: 1.35; }
 .job-entry .job-credits { display: inline-flex; align-items: center; background: var(--jcpd-accent-dim); color: var(--accent); font-weight: 600; white-space: nowrap; font-size: 0.72rem; padding: 3px 9px; border-radius: 99px; }
-.job-entry .del-btn {
+.job-entry .del-btn,
+.job-entry .del-mentor-btn {
   background: none;
   border: none;
   color: var(--red);
@@ -735,6 +736,45 @@ body {
 .ctap-toggle-btn.excluded {
   border-color: var(--surface3);
   color: var(--muted);
+}
+
+/* ── Retrospective inputs (History tab) ── */
+.hi-retro {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-top: 9px;
+}
+.hi-retro-field {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+.hi-retro-label {
+  font-size: 0.68rem;
+  color: var(--muted);
+  font-weight: 500;
+  white-space: nowrap;
+}
+.retro-input {
+  background: var(--surface2);
+  border: 1px solid var(--sep);
+  color: var(--text);
+  border-radius: 8px;
+  padding: 4px 8px;
+  font-size: 0.78rem;
+  width: 62px;
+  text-align: center;
+  font-family: 'JetBrains Mono', monospace;
+  -moz-appearance: textfield;
+}
+.retro-input::-webkit-inner-spin-button,
+.retro-input::-webkit-outer-spin-button { -webkit-appearance: none; margin: 0; }
+.retro-input:focus { outline: 2px solid var(--accent); outline-offset: 0; border-color: transparent; }
+.hi-retro-unit {
+  font-size: 0.68rem;
+  color: var(--muted);
+  font-weight: 600;
 }
 
 /* ── Toast ── */
@@ -1672,4 +1712,444 @@ details[open] .info-chevron { transform: rotate(90deg); }
   font-size: 0.55rem;
   flex-shrink: 0;
 }
+
+/* ── Retro data rows (week summary sheet) ── */
+.wsum-retro-rows {
+  background: var(--surface2);
+  border-radius: var(--jcpd-r-sm);
+  padding: 10px 14px;
+  margin-bottom: 14px;
+}
+.wsum-retro-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 3px 0;
+}
+.wsum-retro-row + .wsum-retro-row {
+  border-top: 1px solid var(--sep);
+  margin-top: 4px;
+  padding-top: 7px;
+}
+.wsum-retro-lbl {
+  font-size: 0.78rem;
+  color: var(--muted);
+  font-weight: 500;
+}
+.wsum-retro-val {
+  font-size: 0.78rem;
+  font-weight: 700;
+  font-family: 'JetBrains Mono', monospace;
+}
+
+/* ── Day strip (week detail sheets) ── */
+.day-strip {
+  display: flex;
+  gap: 6px;
+  margin-bottom: 10px;
+}
+.dsp-pill {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  padding: 8px 2px;
+  border-radius: 10px;
+  border: 1px solid var(--sep);
+  background: var(--surface2);
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+  transition: background 0.12s, border-color 0.12s;
+}
+.dsp-pill.dsp-active {
+  background: var(--accent);
+  border-color: var(--accent);
+}
+.dsp-abbr {
+  font-size: 0.62rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+.dsp-pill.dsp-active .dsp-abbr { color: #fff; }
+.dsp-hrs {
+  font-size: 0.68rem;
+  font-weight: 600;
+  color: var(--text);
+  font-family: 'JetBrains Mono', monospace;
+}
+.dsp-pill.dsp-active .dsp-hrs { color: #fff; }
+
+/* ── Day detail panel ── */
+.day-detail-panel {
+  background: var(--surface2);
+  border-radius: var(--jcpd-r-sm);
+  padding: 12px 14px;
+  margin-bottom: 10px;
+}
+.ddp-header { margin-bottom: 9px; }
+.ddp-date {
+  font-size: 0.83rem;
+  font-weight: 700;
+  color: var(--text);
+  margin-bottom: 3px;
+}
+.ddp-stats-row {
+  display: flex;
+  gap: 14px;
+}
+.ddp-stat {
+  font-size: 0.7rem;
+  color: var(--muted);
+}
+.ddp-stat-val {
+  font-weight: 700;
+  color: var(--text);
+}
+.ddp-stat-val.green { color: var(--green); }
+.ddp-list { display: flex; flex-direction: column; }
+.ddp-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 0;
+  border-bottom: 0.5px solid var(--sep);
+}
+.ddp-row:last-child { border-bottom: none; }
+.ddp-name {
+  flex: 1;
+  font-size: 0.78rem;
+  color: var(--text);
+  line-height: 1.35;
+}
+.ddp-var  { color: var(--muted); font-size: 0.7rem; }
+.ddp-amber  { color: var(--amber); }
+.ddp-accent { color: var(--accent); }
+.ddp-pill {
+  flex-shrink: 0;
+  font-size: 0.67rem;
+  font-weight: 700;
+  font-family: 'JetBrains Mono', monospace;
+  background: rgba(95,210,138,0.10);
+  color: var(--green);
+  border-radius: 6px;
+  padding: 2px 7px;
+  white-space: nowrap;
+}
+.ddp-pill-amber  { background: rgba(255,165,36,0.10); color: var(--amber); }
+.ddp-pill-accent { background: rgba(74,134,216,0.12); color: var(--accent); }
+.ddp-del {
+  flex-shrink: 0;
+  background: none;
+  border: none;
+  color: var(--muted);
+  cursor: pointer;
+  font-size: 0.95rem;
+  padding: 0 0 0 4px;
+  line-height: 1;
+}
+.ddp-del:active { color: var(--red); }
+.ddp-empty {
+  font-size: 0.78rem;
+  color: var(--muted);
+  padding: 8px 0;
+  text-align: center;
+}
+.ddp-total {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding-top: 8px;
+  margin-top: 6px;
+  border-top: 1px solid var(--sep);
+}
+.ddp-total-label {
+  font-size: 0.65rem;
+  font-weight: 700;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+.ddp-total-val {
+  font-size: 0.92rem;
+  font-weight: 700;
+  font-family: 'JetBrains Mono', monospace;
+  color: var(--text);
+}
+.ddp-total-val.green { color: var(--green); }
+.ddp-divider {
+  border-top: 0.5px solid var(--sep);
+  margin: 4px 0 16px;
+}
+
+/* ── Day detail: timestamp chip ── */
+.ddp-ts {
+  flex-shrink: 0;
+  font-size: 0.62rem;
+  font-family: 'JetBrains Mono', monospace;
+  color: var(--muted2);
+  min-width: 34px;
+}
+
+/* ── Day detail: Edit Times button ── */
+.ddp-edit-times-btn {
+  display: block;
+  width: 100%;
+  margin-top: 10px;
+  padding: 8px;
+  background: var(--surface3);
+  border: none;
+  border-radius: 8px;
+  color: var(--muted);
+  font-size: 0.72rem;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+.ddp-edit-times-btn:active { opacity: 0.7; }
+
+/* ── Day detail: edit mode row ── */
+.ddp-row-edit {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 0;
+  border-bottom: 0.5px solid var(--sep);
+}
+.ddp-row-edit:last-child { border-bottom: none; }
+.ddp-time-input {
+  flex-shrink: 0;
+  width: 92px;
+  background: var(--surface3);
+  border: 1px solid var(--sep);
+  border-radius: 7px;
+  color: var(--fg);
+  font-size: 0.78rem;
+  font-family: 'JetBrains Mono', monospace;
+  padding: 4px 6px;
+  text-align: center;
+  color-scheme: dark;
+}
+.ddp-time-input:focus { outline: 1.5px solid var(--accent); outline-offset: 0; }
+
+/* ── Day detail: edit footer ── */
+.ddp-edit-footer {
+  display: flex;
+  gap: 8px;
+  margin-top: 12px;
+}
+.ddp-cancel-edit-btn,
+.ddp-save-times-btn {
+  flex: 1;
+  padding: 9px;
+  border-radius: 9px;
+  border: none;
+  font-size: 0.82rem;
+  font-weight: 600;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+.ddp-cancel-edit-btn { background: var(--surface3); color: var(--muted); }
+.ddp-save-times-btn  { background: var(--accent);   color: #fff; }
+
+/* ── Modal: time row ── */
+.modal-time-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-top: 10px;
+  margin-bottom: 16px;
+}
+.modal-time-label {
+  font-size: 0.8rem;
+  color: var(--muted);
+}
+.modal-time-opt { font-size: 0.72rem; }
+.modal-time-input {
+  background: var(--surface2);
+  border: none;
+  border-radius: 8px;
+  color: var(--fg);
+  font-size: 0.9rem;
+  font-family: 'JetBrains Mono', monospace;
+  padding: 7px 10px;
+  color-scheme: dark;
+  width: 120px;
+  text-align: center;
+}
+.modal-time-input:focus { outline: 2px solid var(--accent); outline-offset: 0; }
+
+/* ── Time toast (post-log start time prompt) ── */
+.time-toast {
+  position: fixed;
+  bottom: calc(80px + env(safe-area-inset-bottom, 0px));
+  left: 50%;
+  transform: translateX(-50%);
+  background: var(--surface2);
+  border: 0.5px solid var(--sep);
+  border-radius: 16px;
+  padding: 14px 16px;
+  z-index: 150;
+  box-shadow: 0 6px 24px rgba(0,0,0,0.45);
+  width: calc(100% - 32px);
+  max-width: 340px;
+}
+.time-toast.hidden { display: none; }
+.time-toast-label {
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: var(--text);
+  margin-bottom: 10px;
+}
+.time-toast-opt { color: var(--muted); font-weight: 400; }
+.time-toast-input {
+  width: 100%;
+  background: var(--surface3);
+  border: none;
+  border-radius: 9px;
+  color: var(--fg);
+  font-size: 1.1rem;
+  font-family: 'JetBrains Mono', monospace;
+  padding: 10px;
+  text-align: center;
+  color-scheme: dark;
+  margin-bottom: 10px;
+}
+.time-toast-input:focus { outline: 2px solid var(--accent); outline-offset: 0; }
+.time-toast-btns { display: flex; gap: 8px; }
+.time-toast-skip,
+.time-toast-save {
+  flex: 1;
+  padding: 10px;
+  border-radius: 10px;
+  border: none;
+  font-size: 0.9rem;
+  font-weight: 600;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+.time-toast-skip { background: var(--surface3); color: var(--muted); }
+.time-toast-save { background: var(--accent);   color: #fff; }
+
+/* ── Coach Card ── */
+.coach-card {
+  position: relative;
+  background: var(--surface);
+  border-radius: var(--radius);
+  border-left: 3px solid var(--accent);
+  padding: 12px 14px 12px 16px;
+  margin-bottom: 12px;
+}
+.coach-card-header { margin-bottom: 7px; }
+.coach-label {
+  font-size: 0.57rem;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--accent);
+}
+.coach-msg {
+  font-size: 0.81rem;
+  color: var(--text);
+  line-height: 1.5;
+}
+.coach-msg + .coach-msg {
+  margin-top: 8px;
+  padding-top: 8px;
+  border-top: 0.5px solid var(--sep);
+}
+
+/* Celebration variant */
+.coach-card-celebration {
+  border-left-color: var(--green);
+  padding-right: 36px;
+}
+.coach-celebrate-check {
+  font-size: 1.1rem;
+  color: var(--green);
+  font-weight: 700;
+  margin-bottom: 5px;
+}
+.coach-card-dismiss {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  background: none;
+  border: none;
+  color: var(--muted);
+  font-size: 0.82rem;
+  cursor: pointer;
+  padding: 2px 4px;
+  line-height: 1;
+  -webkit-tap-highlight-color: transparent;
+}
+.coach-card-dismiss:active { color: var(--text); }
+
+/* ── Coach Log Banner ── */
+.coach-log-banner {
+  background: var(--jcpd-accent-dim);
+  border: 1px solid rgba(74,134,216,0.18);
+  border-radius: 8px;
+  padding: 7px 12px;
+  font-size: 0.74rem;
+  font-weight: 500;
+  color: var(--accent);
+  margin-bottom: 8px;
+  line-height: 1.4;
+}
+
+/* ── Coach Mode toggle (Settings) ── */
+.coach-toggle-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+}
+.coach-mode-toggle {
+  flex-shrink: 0;
+  width: 52px;
+  height: 30px;
+  border-radius: 15px;
+  border: none;
+  cursor: pointer;
+  font-size: 0.67rem;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  transition: background 0.18s;
+  background: var(--surface3);
+  color: var(--muted);
+  margin-top: 2px;
+  -webkit-tap-highlight-color: transparent;
+}
+.coach-mode-toggle.active {
+  background: var(--accent);
+  color: #fff;
+}
+
+/* ── CTAP Trend row (weekly sheets) ── */
+.ctap-trend-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 7px 0;
+  border-top: 0.5px solid var(--sep);
+  margin-bottom: 10px;
+}
+.ctap-trend-label {
+  font-size: 0.62rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+.ctap-trend-val {
+  font-size: 0.74rem;
+  font-weight: 600;
+  font-family: 'JetBrains Mono', monospace;
+  color: var(--text);
+}
+.ctap-trend-val.green { color: var(--green); }
+.ctap-trend-val.red   { color: var(--red); }
 

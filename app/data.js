@@ -41,6 +41,10 @@ const JOB_TYPES = {
     { id: 'hi_lead', name: 'HI Lead (Boiler Lead)', minutes: 58, credits: 0.69, variable: false }
   ],
   absent: [
+    { id: 'wait_work', name: 'Wait Work', minutes: 60, credits: 0.72, variable: true, variableType: 'hours', variablePrompt: 'Time in hours' },
+    { id: 'early_finish', name: 'Early Finish', minutes: 0, credits: 0, variable: true, variableType: 'minutes', variablePrompt: 'How many minutes did you finish early?', isNpt: true, confirmLabel: 'Log Early Finish', skipNameField: true },
+    { id: 'mentor_full', name: 'Mentor Support (Full Day)', minutes: 0, credits: 0, variable: false, isMentorFull: true },
+    { id: 'mentor_partial', name: 'Mentor Support (20% Reduction)', minutes: 0, credits: 0, variable: false, isMentorPartial: true },
     { id: 'ev_charge', name: 'EV Charging', minutes: 30, credits: 0.36, variable: false },
     { id: 'buybox_collection', name: 'Bybox Part Collection', minutes: 10, credits: 0.12, variable: false },
     { id: 'merchant_parts', name: 'Merchant Parts Collection', minutes: 10, credits: 0.12, variable: false },
@@ -116,8 +120,25 @@ function weekLeaveHours(state, week) {
 
 function getDailyTarget(state, week, dayKey) {
   if (dayIsLeave(week, dayKey)) return 0;
+  const mentor = (week.mentorDays || {})[dayKey];
+  if (mentor === 'full') return 0;
   const h = shiftHours((week.shifts || {})[dayKey]);
-  return h !== null ? h : state.baseHours / 5;
+  const base = h !== null ? h : state.baseHours / 5;
+  if (mentor === 'partial') return base * 0.8;
+  return base;
+}
+
+function weekMentorTargetReduction(state, week) {
+  var reduction = 0;
+  var mentorDays = week.mentorDays || {};
+  Object.keys(mentorDays).forEach(function(dk) {
+    var type = mentorDays[dk];
+    var h = shiftHours((week.shifts || {})[dk]);
+    var dayH = h !== null ? h : state.baseHours / 5;
+    if (type === 'full') reduction += dayH;
+    else if (type === 'partial') reduction += dayH * 0.2;
+  });
+  return reduction;
 }
 
 function cumulativeBalance(state) {
@@ -170,7 +191,7 @@ function weekCreditHours(week) {
 }
 
 function adjustedTargetHours(state, week) {
-  return state.baseHours - ((week.deductionMins || 0) / 60) - weekLeaveHours(state, week);
+  return state.baseHours - ((week.deductionMins || 0) / 60) - weekLeaveHours(state, week) - (week.travelHours || 0) - weekMentorTargetReduction(state, week);
 }
 
 function bonusAchieved(state, week) {

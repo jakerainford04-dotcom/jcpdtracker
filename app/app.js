@@ -6,6 +6,10 @@ let activeJobTab = 'core';   // core | hive | sales
 let pendingJob = null;
 let lastGreeting = '';
 let weekSummaryKey = null;
+let forecastSheetOpen = false;
+let activeDayKey = null;
+let pendingTimeEntry = null;
+let dayEditMode = false;
 let activeLogDay = getTodayKey();
 let jobSearch = '';
 
@@ -42,6 +46,14 @@ function buildApp() {
     ${buildWeekForecastSheet()}
     ${buildWeekSummarySheet()}
     <div class="toast" id="toast"></div>
+    <div class="time-toast hidden" id="time-toast">
+      <div class="time-toast-label">Add a start time? <span class="time-toast-opt">(optional)</span></div>
+      <input type="time" id="time-toast-input" class="time-toast-input">
+      <div class="time-toast-btns">
+        <button class="time-toast-skip" id="time-toast-skip">Skip</button>
+        <button class="time-toast-save" id="time-toast-save">Save</button>
+      </div>
+    </div>
   `;
 }
 
@@ -126,7 +138,8 @@ function buildDashboard() {
   const allDedIndexed = allDed.map((d, i) => ({ ...d, logIdx: i }));
   const todayDeds = allDedIndexed.filter(d => d.date === todayKey);
   const prevDeds  = allDedIndexed.filter(d => d.date !== todayKey);
-  const hasAny = todayJobs.length > 0 || allDedIndexed.length > 0;
+  const todayMentor = (week.mentorDays || {})[todayKey];
+  const hasAny = todayJobs.length > 0 || allDedIndexed.length > 0 || !!todayMentor;
   const prevDayHours = Math.max(0, earnedHours - todayHours);
   const hasPrevDayJobs = prevDayHours > 0.001;
 
@@ -263,6 +276,9 @@ function buildDashboard() {
       </div>
     </div>
 
+    ${isCurrentWeek ? buildDeficitClearedCard() : ''}
+    ${isCurrentWeek ? buildCoachCard() : ''}
+
     <div class="split-cards">
       <div class="split-card">
         <div class="split-card-top">
@@ -310,6 +326,12 @@ function buildDashboard() {
               <span class="job-credits" style="color:var(--amber)">-${(d.mins / 60).toFixed(2)}h</span>
               <button class="del-btn del-ded-btn" data-ded-idx="${d.logIdx}" title="Remove">×</button>
             </div>`).join('')
+            + (todayMentor ? `<div class="job-entry">
+              <span class="job-ts">—</span>
+              <span class="job-name" style="color:var(--accent)">${todayMentor === 'full' ? 'Mentor Support (Full Day)' : 'Mentor Support (20% Reduction)'}</span>
+              <span class="job-credits" style="color:var(--accent)">${todayMentor === 'full' ? 'Target 0h' : '−20%'}</span>
+              <button class="del-mentor-btn" data-day="${todayKey}" title="Remove">×</button>
+            </div>` : '')
             + prevDeds.map(d => {
               const dl = new Date(d.date + 'T00:00:00').toLocaleDateString('en-GB', { weekday: 'short' }).toUpperCase();
               return `<div class="job-entry">
@@ -945,7 +967,7 @@ function buildLogJobs() {
       ? filtered.map(j => `<button class="job-btn${j.variable ? ' variable' : ''}" data-job-id="${j.id}">
           ${j.code ? `<span class="jb-code">${j.code}</span>` : ''}
           <span class="jb-name">${j.name}</span>
-          <span class="jb-credits">${j.variable ? 'Variable' : `+${(j.minutes / 60).toFixed(2)}h`}</span>
+          <span class="jb-credits">${j.variable ? 'Variable' : j.isMentorFull ? 'Full day' : j.isMentorPartial ? '−20% target' : `+${(j.minutes / 60).toFixed(2)}h`}</span>
         </button>`).join('')
       : `<div style="grid-column:1/-1;text-align:center;padding:24px 0;font-size:0.82rem;color:var(--muted)">No jobs match "${jobSearch}"</div>`;
     return `
@@ -966,11 +988,12 @@ function buildLogJobs() {
       <button class="${activeJobTab === 'sales' ? 'active' : ''}" data-jobtab="sales">Sales</button>
       <button class="${activeJobTab === 'absent' ? 'active' : ''}" data-jobtab="absent">Absence</button>
     </div>
+    ${activeJobTab === 'core' ? buildCoachLogBanner() : ''}
     <div class="job-grid">
       ${jobs.map(j => `<button class="job-btn${j.variable ? ' variable' : ''}" data-job-id="${j.id}">
           ${j.code ? `<span class="jb-code">${j.code}</span>` : ''}
           <span class="jb-name">${j.name}</span>
-          <span class="jb-credits">${j.variable ? 'Variable' : `+${(j.minutes / 60).toFixed(2)}h`}</span>
+          <span class="jb-credits">${j.variable ? 'Variable' : j.isMentorFull ? 'Full day' : j.isMentorPartial ? '−20% target' : `+${(j.minutes / 60).toFixed(2)}h`}</span>
         </button>`).join('')}
     </div>
     ${sessionBarHTML}
@@ -1037,6 +1060,13 @@ function buildHistory() {
           <div class="hi-credits">${earned.toFixed(2)}h / ${target.toFixed(2)}h target — ${bonus ? 'Bonus ✓' : pct >= 80 ? 'Close' : 'Below target'}</div>
           ${week.note ? `<div class="hi-note">${week.note}</div>` : ''}
           ${isPast ? `<button class="ctap-toggle-btn${excluded ? ' excluded' : ''}" data-week-key="${wk}">${excluded ? '✕ Excluded from CTAP' : '✓ In CTAP'}</button>` : ''}
+          ${isPast ? `<div class="hi-retro">
+            <div class="hi-retro-field">
+              <span class="hi-retro-label">Travel</span>
+              <input type="number" class="retro-input" data-retro-field="travelHours" data-week-key="${wk}" value="${week.travelHours != null ? week.travelHours : ''}" placeholder="0.00" step="0.01" min="0">
+              <span class="hi-retro-unit">h</span>
+            </div>
+          </div>` : ''}
         </div>
         <div class="history-dot ${colour}"></div>
       </div>`;
@@ -1048,9 +1078,19 @@ function buildHistory() {
 // ── Settings ───────────────────────────────────────────────────────────────
 function buildSettings() {
   const isLight = document.body.classList.contains('light');
+  const coachOn = isCoachModeOn();
   return `
     <div class="dashboard-card">
       <h2>Settings</h2>
+      <div class="settings-group" style="margin-top:12px">
+        <div class="coach-toggle-row">
+          <div style="flex:1;min-width:0">
+            <label>Coach Mode</label>
+            <p class="settings-note" style="margin-top:3px">Surfaces personalised tips and targets to help you perform at your best</p>
+          </div>
+          <button class="coach-mode-toggle${coachOn ? ' active' : ''}" id="coach-mode-toggle">${coachOn ? 'On' : 'Off'}</button>
+        </div>
+      </div>
       <div class="settings-group" style="margin-top:12px">
         <label>Appearance</label>
         <div style="display:flex;gap:8px;margin-top:8px">
@@ -1163,6 +1203,10 @@ function buildModal() {
         <p id="modal-desc"></p>
         <input type="number" id="modal-input" min="1" step="1" placeholder="0">
         <input type="text" id="modal-name" placeholder="Reason (optional)" style="display:none;margin-top:10px;width:100%;background:var(--surface2);border:none;border-radius:10px;color:var(--fg);font-size:0.9rem;padding:10px 12px;outline:none;box-sizing:border-box;-webkit-appearance:none">
+        <div class="modal-time-row">
+          <span class="modal-time-label">Start time <span class="modal-time-opt">(optional)</span></span>
+          <input type="time" id="modal-time" class="modal-time-input">
+        </div>
         <div class="modal-btns">
           <button class="btn-cancel" id="modal-cancel">Cancel</button>
           <button class="btn-confirm" id="modal-confirm">Log Job</button>
@@ -1173,6 +1217,208 @@ function buildModal() {
 }
 
 // ── Week Forecast Sheet ────────────────────────────────────────────────────
+// ── Day strip + detail panel (shared by forecast & summary sheets) ──────────
+function buildDayStrip(weekKey, week, activeDk) {
+  const days = weekDays(weekKey).slice(0, 5);
+  const DAY_ABB = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri'];
+  return `<div class="day-strip" data-week-key="${weekKey}">${days.map((dk, i) => {
+    const h = ((week.days || {})[dk] || []).reduce((s, j) => s + j.creditMins, 0) / 60;
+    const isLeave = dayIsLeave(week, dk);
+    const lbl = isLeave ? 'AL' : (h > 0 ? h.toFixed(1) + 'h' : '—');
+    return `<button class="dsp-pill${dk === activeDk ? ' dsp-active' : ''}" data-strip-day="${dk}">
+      <span class="dsp-abbr">${DAY_ABB[i]}</span>
+      <span class="dsp-hrs">${lbl}</span>
+    </button>`;
+  }).join('')}</div>`;
+}
+
+function buildDayDetailPanel(weekKey, week, dk, editMode) {
+  const jobs = (week.days || {})[dk] || [];
+  const allDeds = week.deductionLog || [];
+  const dayDeds = allDeds.map((d, i) => ({ ...d, logIdx: i })).filter(d => d.date === dk);
+  const mentor = (week.mentorDays || {})[dk];
+  const isLeave = dayIsLeave(week, dk);
+  const creditsH = jobs.reduce((s, j) => s + j.creditMins, 0) / 60;
+  const rawTarget = getDailyTarget(state, week, dk);
+  const dateLabel = new Date(dk + 'T00:00:00').toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'short' });
+  const isEmpty = jobs.length === 0 && dayDeds.length === 0 && !mentor && !isLeave;
+  const earnColour = !isLeave && creditsH > 0 && creditsH >= rawTarget ? 'green' : '';
+
+  const header = `<div class="ddp-header">
+    <div class="ddp-date">${dateLabel}</div>
+    <div class="ddp-stats-row">
+      <span class="ddp-stat">Target <span class="ddp-stat-val${isLeave ? ' ddp-amber' : ''}">${isLeave ? '0h' : rawTarget.toFixed(2) + 'h'}</span></span>
+      <span class="ddp-stat">Earned <span class="ddp-stat-val ${earnColour}">${creditsH.toFixed(2)}h</span></span>
+    </div>
+  </div>`;
+
+  if (editMode && jobs.length > 0) {
+    const editRows = jobs.map((j, i) => {
+      const dt = j.startTime ? new Date(j.startTime) : null;
+      const tsVal = dt ? `${String(dt.getHours()).padStart(2,'0')}:${String(dt.getMinutes()).padStart(2,'0')}` : '';
+      return `<div class="ddp-row ddp-row-edit">
+        <span class="ddp-name">${j.name}${j.variableInput ? ` <span class="ddp-var">(${j.variableInput})</span>` : ''}</span>
+        <input type="time" class="ddp-time-input" data-job-edit-idx="${i}" value="${tsVal}">
+      </div>`;
+    }).join('');
+    return `<div class="day-detail-panel">
+      ${header}
+      <div class="ddp-list">${editRows}</div>
+      <div class="ddp-edit-footer">
+        <button class="ddp-cancel-edit-btn">Cancel</button>
+        <button class="ddp-save-times-btn" data-week-key="${weekKey}" data-day-key="${dk}">Save</button>
+      </div>
+    </div>`;
+  }
+
+  const jobRows = jobs.map((j, i) => {
+    const tsStr = j.startTime
+      ? new Date(j.startTime).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })
+      : '';
+    return `<div class="ddp-row">
+      ${tsStr ? `<span class="ddp-ts">${tsStr}</span>` : ''}
+      <span class="ddp-name">${j.name}${j.variableInput ? ` <span class="ddp-var">(${j.variableInput})</span>` : ''}</span>
+      <span class="ddp-pill">+${(j.creditMins / 60).toFixed(2)}h</span>
+      <button class="ddp-del" data-week-key="${weekKey}" data-day-key="${dk}" data-job-idx="${i}" title="Remove">×</button>
+    </div>`;
+  }).join('');
+
+  const dedRows = dayDeds.map(d => `
+    <div class="ddp-row">
+      <span class="ddp-name ddp-amber">${d.name}</span>
+      <span class="ddp-pill ddp-pill-amber">−${(d.mins / 60).toFixed(2)}h</span>
+      <button class="ddp-del" data-week-key="${weekKey}" data-day-key="${dk}" data-ded-idx="${d.logIdx}" title="Remove">×</button>
+    </div>`).join('');
+
+  const mentorRow = mentor ? `
+    <div class="ddp-row">
+      <span class="ddp-name ddp-accent">${mentor === 'full' ? 'Mentor Support (Full Day)' : 'Mentor Support (20% Reduction)'}</span>
+      <span class="ddp-pill ddp-pill-accent">${mentor === 'full' ? 'Target 0h' : '−20%'}</span>
+      <button class="ddp-del" data-week-key="${weekKey}" data-day-key="${dk}" data-del-mentor="" title="Remove">×</button>
+    </div>` : '';
+
+  const leaveRow = isLeave ? `
+    <div class="ddp-row"><span class="ddp-name ddp-amber">Annual Leave</span><span class="ddp-pill ddp-pill-amber">Target 0h</span></div>` : '';
+
+  const editTimesBtn = jobs.length > 0
+    ? `<button class="ddp-edit-times-btn" data-week-key="${weekKey}" data-day-key="${dk}">Edit Times</button>`
+    : '';
+
+  return `<div class="day-detail-panel">
+    ${header}
+    ${isEmpty
+      ? '<div class="ddp-empty">Nothing logged</div>'
+      : `<div class="ddp-list">${leaveRow}${jobRows}${dedRows}${mentorRow}</div>
+         <div class="ddp-total"><span class="ddp-total-label">Day total</span><span class="ddp-total-val ${earnColour}">${creditsH.toFixed(2)}h</span></div>
+         ${editTimesBtn}`
+    }
+  </div>`;
+}
+
+function handleSheetInteraction(e) {
+  const pill = e.target.closest('[data-strip-day]');
+  if (pill) {
+    e.stopPropagation();
+    dayEditMode = false;
+    const dk = pill.dataset.stripDay;
+    activeDayKey = dk;
+    const strip = pill.closest('.day-strip');
+    const weekKey = strip && strip.dataset.weekKey;
+    if (!weekKey) return;
+    const wk = state.weeks[weekKey] || {};
+    strip.querySelectorAll('[data-strip-day]').forEach(b => {
+      b.classList.toggle('dsp-active', b.dataset.stripDay === dk);
+    });
+    const wrap = pill.closest('.forecast-panel').querySelector('.day-detail-wrap');
+    if (wrap) wrap.innerHTML = buildDayDetailPanel(weekKey, wk, dk, false);
+    return;
+  }
+
+  const editTimesBtn = e.target.closest('.ddp-edit-times-btn');
+  if (editTimesBtn) {
+    e.stopPropagation();
+    dayEditMode = true;
+    const weekKey = editTimesBtn.dataset.weekKey;
+    const dayKey = editTimesBtn.dataset.dayKey;
+    const wk = state.weeks[weekKey] || {};
+    const wrap = editTimesBtn.closest('.forecast-panel').querySelector('.day-detail-wrap');
+    if (wrap) wrap.innerHTML = buildDayDetailPanel(weekKey, wk, dayKey, true);
+    return;
+  }
+
+  const cancelEditBtn = e.target.closest('.ddp-cancel-edit-btn');
+  if (cancelEditBtn) {
+    e.stopPropagation();
+    dayEditMode = false;
+    const saveBtn = cancelEditBtn.closest('.ddp-edit-footer') && cancelEditBtn.closest('.ddp-edit-footer').querySelector('.ddp-save-times-btn');
+    const weekKey = saveBtn && saveBtn.dataset.weekKey;
+    const dayKey = saveBtn && saveBtn.dataset.dayKey;
+    if (weekKey && dayKey) {
+      const wk = state.weeks[weekKey] || {};
+      const wrap = cancelEditBtn.closest('.forecast-panel').querySelector('.day-detail-wrap');
+      if (wrap) wrap.innerHTML = buildDayDetailPanel(weekKey, wk, dayKey, false);
+    }
+    return;
+  }
+
+  const saveTimesBtn = e.target.closest('.ddp-save-times-btn');
+  if (saveTimesBtn) {
+    e.stopPropagation();
+    const weekKey = saveTimesBtn.dataset.weekKey;
+    const dayKey = saveTimesBtn.dataset.dayKey;
+    const wk = state.weeks[weekKey];
+    const panel = saveTimesBtn.closest('.day-detail-panel');
+    if (wk && panel) {
+      panel.querySelectorAll('.ddp-time-input').forEach(input => {
+        const idx = parseInt(input.dataset.jobEditIdx, 10);
+        const timeVal = input.value;
+        if ((wk.days || {})[dayKey] && wk.days[dayKey][idx] !== undefined) {
+          if (timeVal) {
+            const [h, m] = timeVal.split(':').map(Number);
+            const d = new Date(dayKey + 'T00:00:00');
+            d.setHours(h, m, 0, 0);
+            wk.days[dayKey][idx].startTime = d.toISOString();
+          } else {
+            delete wk.days[dayKey][idx].startTime;
+          }
+        }
+      });
+      saveState(state);
+    }
+    dayEditMode = false;
+    const week = state.weeks[weekKey] || {};
+    const wrap = saveTimesBtn.closest('.forecast-panel').querySelector('.day-detail-wrap');
+    if (wrap) wrap.innerHTML = buildDayDetailPanel(weekKey, week, dayKey, false);
+    return;
+  }
+
+  const del = e.target.closest('.ddp-del');
+  if (del) {
+    e.stopPropagation();
+    const weekKey = del.dataset.weekKey;
+    const dayKey = del.dataset.dayKey;
+    const wk = state.weeks[weekKey];
+    if (!wk) return;
+    if ('delMentor' in del.dataset) {
+      if (wk.mentorDays) delete wk.mentorDays[dayKey];
+    } else if ('dedIdx' in del.dataset) {
+      const idx = parseInt(del.dataset.dedIdx, 10);
+      if (wk.deductionLog) {
+        wk.deductionLog.splice(idx, 1);
+        wk.deductionMins = wk.deductionLog.reduce((s, d) => s + d.mins, 0);
+      }
+    } else if ('jobIdx' in del.dataset) {
+      const idx = parseInt(del.dataset.jobIdx, 10);
+      if ((wk.days || {})[dayKey]) {
+        wk.days[dayKey].splice(idx, 1);
+        if (wk.days[dayKey].length === 0) delete wk.days[dayKey];
+      }
+    }
+    saveState(state);
+    render();
+  }
+}
+
 function buildWeekForecastSheet() {
   const week = getOrCreateWeek(state, currentWeekKey);
   const todayKey = getTodayKey();
@@ -1220,6 +1466,8 @@ function buildWeekForecastSheet() {
   const pct       = targetHours > 0 ? Math.min((earnedHours / targetHours) * 100, 100) : 0;
   const barColour = pct >= 100 ? 'green' : pct >= 80 ? 'amber' : 'red';
   const isFinalTone = isPastWeek || (!isFutureWeek && daysRemaining === 0);
+  const wkDays5   = wDays.slice(0, 5);
+  const initDay   = (activeDayKey && wkDays5.includes(activeDayKey)) ? activeDayKey : wkDays5[0];
 
   // Plain English summary
   let summary;
@@ -1258,7 +1506,7 @@ function buildWeekForecastSheet() {
   }
 
   return `
-    <div class="forecast-sheet hidden" id="forecast-sheet">
+    <div class="forecast-sheet${forecastSheetOpen ? '' : ' hidden'}" id="forecast-sheet">
       <div class="forecast-backdrop" id="forecast-backdrop"></div>
       <div class="forecast-panel">
         <div class="forecast-handle"></div>
@@ -1268,6 +1516,10 @@ function buildWeekForecastSheet() {
         </div>
         <div class="forecast-body">
 
+          ${buildDayStrip(currentWeekKey, week, initDay)}
+          <div class="day-detail-wrap">${buildDayDetailPanel(currentWeekKey, week, initDay, dayEditMode)}</div>
+          <div class="ddp-divider"></div>
+
           <div class="forecast-prog-row">
             <span class="forecast-prog-label">Credits earned</span>
             <span class="forecast-prog-val">${earnedHours.toFixed(2)}h <span class="forecast-prog-of">of ${targetHours.toFixed(1)}h</span></span>
@@ -1275,7 +1527,8 @@ function buildWeekForecastSheet() {
           <div class="progress-bar" style="margin:7px 0 4px">
             <div class="progress-bar-fill ${barColour}" style="width:${pct.toFixed(1)}%"></div>
           </div>
-          <div style="font-size:0.62rem;color:var(--muted);text-align:right;margin-bottom:14px">${Math.round(pct)}% of target</div>
+          <div style="font-size:0.62rem;color:var(--muted);text-align:right;margin-bottom:4px">${Math.round(pct)}% of target</div>
+          ${buildCtapTrend()}
 
           <div class="forecast-summary-box">
             <div class="forecast-summary-text">${summary}</div>
@@ -1323,10 +1576,16 @@ function buildWeekForecastSheet() {
 }
 
 function openForecastSheet() {
+  forecastSheetOpen = true;
+  const todayKey = getTodayKey();
+  const wkDays5 = weekDays(currentWeekKey).slice(0, 5);
+  activeDayKey = wkDays5.includes(todayKey) ? todayKey : wkDays5[0];
   document.getElementById('forecast-sheet').classList.remove('hidden');
 }
 
 function closeForecastSheet() {
+  forecastSheetOpen = false;
+  dayEditMode = false;
   document.getElementById('forecast-sheet').classList.add('hidden');
 }
 
@@ -1338,6 +1597,8 @@ function buildWeekSummarySheet() {
   if (!week) return emptySheet;
 
   const wk = weekSummaryKey;
+  const wkDays5 = weekDays(wk).slice(0, 5);
+  const initDay = (activeDayKey && wkDays5.includes(activeDayKey)) ? activeDayKey : wkDays5[0];
   const earned = weekCreditHours(week);
   const target = adjustedTargetHours(state, week);
   const bonus = bonusAchieved(state, week);
@@ -1438,6 +1699,10 @@ function buildWeekSummarySheet() {
         </div>
         <div class="forecast-body">
 
+          ${buildDayStrip(wk, week, initDay)}
+          <div class="day-detail-wrap">${buildDayDetailPanel(wk, week, initDay, dayEditMode)}</div>
+          <div class="ddp-divider"></div>
+
           <div class="wsum-status-banner ${bonus ? 'green' : 'red'}">
             <div class="wsum-status-icon">${bonus ? '✓' : '✕'}</div>
             <div>
@@ -1452,9 +1717,17 @@ function buildWeekSummarySheet() {
             <span class="forecast-prog-label">Credits earned</span>
             <span class="forecast-prog-val">${earned.toFixed(2)}h <span class="forecast-prog-of">of ${target.toFixed(1)}h</span></span>
           </div>
-          <div class="progress-bar" style="margin:7px 0 14px">
+          <div class="progress-bar" style="margin:7px 0 4px">
             <div class="progress-bar-fill ${barColour}" style="width:${pct.toFixed(1)}%"></div>
           </div>
+          ${buildCtapTrend()}
+
+          ${(week.travelHours || week.waitWorkHours) ? `
+          <div style="font-size:0.57rem;font-weight:700;letter-spacing:0.1em;color:var(--muted);text-transform:uppercase;margin-bottom:8px">Retrospective</div>
+          <div class="wsum-retro-rows">
+            ${week.travelHours ? `<div class="wsum-retro-row"><span class="wsum-retro-lbl">Travel</span><span class="wsum-retro-val" style="color:var(--amber)">−${week.travelHours.toFixed(2)}h target</span></div>` : ''}
+            ${week.waitWorkHours ? `<div class="wsum-retro-row"><span class="wsum-retro-lbl">Wait Work</span><span class="wsum-retro-val" style="color:var(--green)">+${week.waitWorkHours.toFixed(2)}h credit</span></div>` : ''}
+          </div>` : ''}
 
           <div class="forecast-stats" style="margin-bottom:14px">
             <div class="forecast-stat">
@@ -1511,6 +1784,7 @@ function buildWeekSummarySheet() {
 
 function closeWeekSummary() {
   weekSummaryKey = null;
+  dayEditMode = false;
   const el = document.getElementById('week-summary-sheet');
   if (el) el.classList.add('hidden');
 }
@@ -1656,7 +1930,8 @@ function attachListeners() {
       } else {
         btn.classList.add('logged');
         setTimeout(() => btn.classList.remove('logged'), 380);
-        logJob(job, null);
+        const result = logJob(job, null);
+        if (result) showTimePicker(result.weekKey, result.dayKey, result.idx);
       }
     });
   });
@@ -1672,6 +1947,7 @@ function attachListeners() {
   document.querySelectorAll('.del-btn').forEach(btn => {
     btn.addEventListener('click', e => {
       e.stopPropagation();
+      if (btn.classList.contains('del-ded-btn') || btn.classList.contains('del-mentor-btn')) return;
       const dayKey = btn.dataset.day;
       const idx = parseInt(btn.dataset.idx, 10);
       const week = getOrCreateWeek(state, currentWeekKey);
@@ -1679,6 +1955,21 @@ function attachListeners() {
       if (week.days[dayKey].length === 0) delete week.days[dayKey];
       saveState(state);
       render();
+    });
+  });
+
+  // Delete mentor day flag
+  document.querySelectorAll('.del-mentor-btn').forEach(btn => {
+    btn.addEventListener('click', e => {
+      e.stopPropagation();
+      const dayKey = btn.dataset.day;
+      const weekKey = getWeekKey(new Date(dayKey + 'T00:00:00'));
+      const week = state.weeks[weekKey];
+      if (week && week.mentorDays) {
+        delete week.mentorDays[dayKey];
+        saveState(state);
+        render();
+      }
     });
   });
 
@@ -1786,6 +2077,21 @@ function attachListeners() {
     showToast('Starting balance saved');
   });
 
+  // Coach mode toggle
+  const coachToggle = document.getElementById('coach-mode-toggle');
+  if (coachToggle) coachToggle.addEventListener('click', () => {
+    localStorage.setItem('jcpd_coach_mode', isCoachModeOn() ? 'false' : 'true');
+    render();
+  });
+
+  // Dismiss deficit-cleared celebration card
+  const dismissDeficit = document.getElementById('dismiss-deficit-cleared');
+  if (dismissDeficit) dismissDeficit.addEventListener('click', () => {
+    localStorage.setItem('jcpd_deficit_cleared_seen', 'true');
+    const card = document.getElementById('deficit-cleared-card');
+    if (card) card.remove();
+  });
+
   // Theme toggle
   document.querySelectorAll('.theme-btn').forEach(btn => {
     btn.addEventListener('click', () => {
@@ -1809,11 +2115,37 @@ function attachListeners() {
 
   // History item click → navigate to that week; show summary for past weeks
   document.querySelectorAll('[data-goto-week]').forEach(el => {
-    el.addEventListener('click', () => {
+    el.addEventListener('click', e => {
+      if (e.target.closest('.hi-retro')) return;
       const wk = el.dataset.gotoWeek;
       currentWeekKey = wk;
       activeTab = 'dashboard';
       weekSummaryKey = wk < getWeekKey(new Date()) ? wk : null;
+      if (weekSummaryKey) activeDayKey = weekDays(wk)[0]; // default to Monday
+      render();
+    });
+  });
+
+  // Day strip + day detail panel — event delegation on both sheets
+  ['forecast-sheet', 'week-summary-sheet'].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.addEventListener('click', handleSheetInteraction);
+  });
+
+  // Retro fields (Travel / Wait Work) — save on blur
+  document.querySelectorAll('.retro-input').forEach(input => {
+    input.addEventListener('blur', () => {
+      const field = input.dataset.retroField;
+      const wk = input.dataset.weekKey;
+      if (!state.weeks[wk]) return;
+      const raw = input.value.trim();
+      if (raw === '') {
+        delete state.weeks[wk][field];
+      } else {
+        const val = parseFloat(raw);
+        if (!isNaN(val) && val >= 0) state.weeks[wk][field] = val;
+      }
+      saveState(state);
       render();
     });
   });
@@ -1847,6 +2179,29 @@ function attachListeners() {
   const summaryBackdrop = document.getElementById('summary-backdrop');
   if (summaryBackdrop) summaryBackdrop.addEventListener('click', closeWeekSummary);
 
+  // Time toast (quick start-time entry after fixed job log)
+  const timeToastSave = document.getElementById('time-toast-save');
+  const timeToastSkip = document.getElementById('time-toast-skip');
+  if (timeToastSave) timeToastSave.addEventListener('click', () => {
+    if (pendingTimeEntry) {
+      const input = document.getElementById('time-toast-input');
+      const timeVal = input ? input.value : '';
+      if (timeVal) {
+        const { weekKey, dayKey, idx } = pendingTimeEntry;
+        const wk = state.weeks[weekKey];
+        if (wk && (wk.days || {})[dayKey] && wk.days[dayKey][idx] !== undefined) {
+          const [h, m] = timeVal.split(':').map(Number);
+          const d = new Date(dayKey + 'T00:00:00');
+          d.setHours(h, m, 0, 0);
+          wk.days[dayKey][idx].startTime = d.toISOString();
+          saveState(state);
+        }
+      }
+    }
+    hideTimePicker();
+  });
+  if (timeToastSkip) timeToastSkip.addEventListener('click', hideTimePicker);
+
   // Modal
   const overlay = document.getElementById('modal-overlay');
   const modalCancel = document.getElementById('modal-cancel');
@@ -1859,7 +2214,8 @@ function attachListeners() {
     const val = parseFloat(modalInput.value);
     if (!val || val <= 0) { modalInput.focus(); return; }
     const nameVal = (document.getElementById('modal-name').value || '').trim();
-    logJob(pendingJob, val, nameVal);
+    const timeVal = (document.getElementById('modal-time').value || '').trim();
+    logJob(pendingJob, val, nameVal, timeVal || null);
     closeModal();
   });
   if (modalInput) {
@@ -1886,8 +2242,11 @@ function openModal(job) {
   input.value = '';
   const nameField = document.getElementById('modal-name');
   nameField.value = '';
-  nameField.style.display = job.isNpt ? 'block' : 'none';
-  document.getElementById('modal-confirm').textContent = job.isNpt ? 'Log Absence' : 'Log Job';
+  nameField.style.display = (job.isNpt && !job.skipNameField) ? 'block' : 'none';
+  document.getElementById('modal-confirm').textContent = job.confirmLabel || (job.isNpt ? 'Log Absence' : 'Log Job');
+  const now = new Date();
+  const timeField = document.getElementById('modal-time');
+  if (timeField) timeField.value = `${String(now.getHours()).padStart(2,'0')}:${String(now.getMinutes()).padStart(2,'0')}`;
   overlay.classList.remove('hidden');
   setTimeout(() => input.focus(), 100);
 }
@@ -1897,7 +2256,7 @@ function closeModal() {
   pendingJob = null;
 }
 
-function logJob(job, variableValue, optionalName) {
+function logJob(job, variableValue, optionalName, startTimeStr) {
   const targetDay = activeLogDay;
   const targetWeekKey = getWeekKey(new Date(targetDay + 'T00:00:00'));
 
@@ -1906,17 +2265,39 @@ function logJob(job, variableValue, optionalName) {
     return;
   }
 
-  // NPT quick-log: save as deduction, not a credit entry
+  // Mentor Support Full Day
+  if (job.isMentorFull) {
+    const week = getOrCreateWeek(state, targetWeekKey);
+    if (!week.mentorDays) week.mentorDays = {};
+    week.mentorDays[targetDay] = 'full';
+    saveState(state);
+    showToast('Mentor Support logged — full day');
+    if (activeTab !== 'log') render();
+    return;
+  }
+
+  // Mentor Support 20% Reduction
+  if (job.isMentorPartial) {
+    const week = getOrCreateWeek(state, targetWeekKey);
+    if (!week.mentorDays) week.mentorDays = {};
+    week.mentorDays[targetDay] = 'partial';
+    saveState(state);
+    showToast('Mentor Support logged — 20%');
+    if (activeTab !== 'log') render();
+    return;
+  }
+
+  // NPT / Early Finish: save as deduction, not a credit entry
   if (job.isNpt) {
     const mins = Math.round(variableValue);
     if (!mins || mins <= 0) return;
-    const label = optionalName || 'Non-Productive Time';
+    const label = job.skipNameField ? job.name : (optionalName || 'Non-Productive Time');
     const week = getOrCreateWeek(state, targetWeekKey);
     if (!week.deductionLog) week.deductionLog = [];
     week.deductionLog.push({ name: label, mins, date: targetDay });
     week.deductionMins = (week.deductionMins || 0) + mins;
     saveState(state);
-    showToast('NPT added — ' + mins + ' min');
+    showToast(label + ' — ' + mins + ' min');
     if (activeTab !== 'log') render();
     return;
   }
@@ -1944,6 +2325,13 @@ function logJob(job, variableValue, optionalName) {
     ts: Date.now()
   };
 
+  if (startTimeStr) {
+    const [h, m] = startTimeStr.split(':').map(Number);
+    const d = new Date(targetDay + 'T00:00:00');
+    d.setHours(h, m, 0, 0);
+    entry.startTime = d.toISOString();
+  }
+
   const week = getOrCreateWeek(state, targetWeekKey);
   const day = getOrCreateDay(week, targetDay);
   day.push(entry);
@@ -1957,6 +2345,206 @@ function logJob(job, variableValue, optionalName) {
   } else {
     render();
   }
+  return { weekKey: targetWeekKey, dayKey: targetDay, idx: day.length - 1 };
+}
+
+function showTimePicker(weekKey, dayKey, idx) {
+  pendingTimeEntry = { weekKey, dayKey, idx };
+  const now = new Date();
+  const input = document.getElementById('time-toast-input');
+  if (input) input.value = `${String(now.getHours()).padStart(2,'0')}:${String(now.getMinutes()).padStart(2,'0')}`;
+  const toast = document.getElementById('time-toast');
+  if (toast) toast.classList.remove('hidden');
+}
+
+function hideTimePicker() {
+  pendingTimeEntry = null;
+  const toast = document.getElementById('time-toast');
+  if (toast) toast.classList.add('hidden');
+}
+
+// ── Coach Mode ─────────────────────────────────────────────────────────────
+function isCoachModeOn() {
+  return localStorage.getItem('jcpd_coach_mode') !== 'false';
+}
+
+function getBestFixedJob() {
+  const all = [...JOB_TYPES.core, ...JOB_TYPES.hive, ...JOB_TYPES.sales];
+  const fixed = all.filter(j => !j.variable && !j.isMentorFull && !j.isMentorPartial && !j.isNpt && j.minutes > 0);
+  return fixed.length ? fixed.reduce((best, j) => j.minutes > best.minutes ? j : best, fixed[0]) : null;
+}
+
+function getHistoricallyStrongDay() {
+  const todayWk = getWeekKey(new Date());
+  const pastWks = Object.keys(state.weeks).filter(wk => wk < todayWk).sort().slice(-8);
+  if (pastWks.length < 3) return null;
+  const totals = [0,0,0,0,0], counts = [0,0,0,0,0];
+  pastWks.forEach(wkKey => {
+    const wk = state.weeks[wkKey];
+    weekDays(wkKey).slice(0,5).forEach((dk, i) => {
+      const jobs = (wk.days || {})[dk] || [];
+      if (jobs.length > 0 && !dayIsLeave(wk, dk)) {
+        totals[i] += jobs.reduce((s,j) => s + j.creditMins, 0) / 60;
+        counts[i]++;
+      }
+    });
+  });
+  const avgs = totals.map((t, i) => counts[i] >= 3 ? t / counts[i] : 0);
+  const maxAvg = Math.max(...avgs);
+  if (maxAvg === 0) return null;
+  const totalH = totals.reduce((s,t) => s+t, 0);
+  const totalC = counts.reduce((s,c) => s+c, 0);
+  const overallAvg = totalC > 0 ? totalH / totalC : 0;
+  if (maxAvg < overallAvg * 1.15) return null;
+  return ['Monday','Tuesday','Wednesday','Thursday','Friday'][avgs.indexOf(maxAvg)];
+}
+
+function buildCtapTrend() {
+  const todayWk = getWeekKey(new Date());
+  const pastWks = Object.keys(state.weeks)
+    .filter(wk => wk < todayWk && !state.weeks[wk].excludeFromCtap)
+    .sort().slice(-6);
+  if (pastWks.length < 3) return '';
+  const netChange = pastWks.reduce((sum, wk) => {
+    const w = state.weeks[wk];
+    return sum + weekCreditHours(w) - adjustedTargetHours(state, w);
+  }, 0);
+  const arrow = netChange > 0.3 ? '↑' : netChange < -0.3 ? '↓' : '→';
+  const cls = netChange > 0.3 ? ' green' : netChange < -0.3 ? ' red' : '';
+  const sign = netChange >= 0 ? '+' : '';
+  return `<div class="ctap-trend-row">
+    <span class="ctap-trend-label">CTAP Trend</span>
+    <span class="ctap-trend-val${cls}">${arrow} ${sign}${netChange.toFixed(2)}h over ${pastWks.length} weeks</span>
+  </div>`;
+}
+
+function buildCoachCard() {
+  if (!isCoachModeOn()) return '';
+  const todayWk = getWeekKey(new Date());
+  const week = state.weeks[todayWk] || { days: {}, shifts: {} };
+  const bal = cumulativeBalance(state);
+  const earnedHours = weekCreditHours(week);
+  const targetHours = adjustedTargetHours(state, week);
+  const bonus = bonusAchieved(state, week);
+  const pastWks = Object.keys(state.weeks).filter(wk => wk < todayWk).sort();
+  const msgs = [];
+
+  if (bal < -0.05) {
+    const deficitH = Math.abs(bal);
+    const extraPerDay = deficitH / 20;
+    msgs.push(`You're ${deficitH.toFixed(2)}h in deficit. To clear it in 4 weeks, aim for +${extraPerDay.toFixed(2)}h above target each day.`);
+    const lastWkKey = pastWks.filter(wk => !state.weeks[wk].excludeFromCtap).pop();
+    if (lastWkKey) {
+      const lastWk = state.weeks[lastWkKey];
+      const contrib = weekCreditHours(lastWk) - adjustedTargetHours(state, lastWk);
+      if (contrib >= 0.05) {
+        msgs.push(`Your deficit reduced by ${contrib.toFixed(2)}h last week — you're moving in the right direction.`);
+      } else if (contrib < -0.05) {
+        msgs.push(`Your deficit grew slightly last week. One strong day can start turning that around.`);
+      } else {
+        const bj = getBestFixedJob();
+        if (bj) msgs.push(`A ${bj.name.replace(/\s*\(.*$/, '').trim()} gives you ${(bj.minutes/60).toFixed(2)}h — your highest value single job.`);
+      }
+    } else {
+      const bj = getBestFixedJob();
+      if (bj) msgs.push(`A ${bj.name.replace(/\s*\(.*$/, '').trim()} gives you ${(bj.minutes/60).toFixed(2)}h — your highest value single job.`);
+    }
+  } else if (!bonus && targetHours > 0.05) {
+    msgs.push(`You're in credit — staying consistent this week protects your balance.`);
+    const todayKey = getTodayKey();
+    const wkDays5 = weekDays(todayWk).slice(0, 5);
+    const remainDays = wkDays5.filter(dk => dk >= todayKey && !dayIsLeave(week, dk)).length;
+    const needed = targetHours - earnedHours;
+    if (needed > 0.05 && remainDays > 0) {
+      msgs.push(`You need ${needed.toFixed(2)}h across ${remainDays} remaining day${remainDays === 1 ? '' : 's'} to hit this week's target.`);
+    }
+  } else if (bonus) {
+    let streak = 0;
+    for (let i = pastWks.length - 1; i >= 0; i--) {
+      const w = state.weeks[pastWks[i]];
+      if (!w || !bonusAchieved(state, w)) break;
+      streak++;
+    }
+    streak++; // include current week
+    if (streak >= 2) {
+      msgs.push(`You've hit target ${streak} weeks in a row — great consistency.`);
+    } else {
+      const todayKey = getTodayKey();
+      const wkDays5 = weekDays(todayWk).slice(0, 5);
+      const workedDays = wkDays5.filter(dk => dk <= todayKey && !dayIsLeave(week, dk) && ((week.days||{})[dk]||[]).length > 0).length;
+      const remainDays = wkDays5.filter(dk => dk > todayKey && !dayIsLeave(week, dk)).length;
+      if (workedDays > 0 && remainDays > 0) {
+        const projected = earnedHours + (earnedHours / workedDays) * remainDays;
+        msgs.push(`On current pace you'll finish at ${projected.toFixed(2)}h — ${(projected - targetHours).toFixed(2)}h above target.`);
+      } else {
+        msgs.push(`CTAP balance: +${bal.toFixed(2)}h — you're in credit. Keep the consistency going.`);
+      }
+    }
+    const strongDay = getHistoricallyStrongDay();
+    if (strongDay) {
+      msgs.push(`${strongDay} is typically your strongest day — a good one to push for more.`);
+    } else if (bal > 0.05) {
+      msgs.push(`CTAP balance: +${bal.toFixed(2)}h in credit. Keep the consistency going.`);
+    }
+  }
+
+  if (!msgs.length) return '';
+  return `<div class="coach-card">
+    <div class="coach-card-header"><span class="coach-label">Coach</span></div>
+    ${msgs.map(m => `<div class="coach-msg">${m}</div>`).join('')}
+  </div>`;
+}
+
+function buildDeficitClearedCard() {
+  if (!isCoachModeOn()) return '';
+  if (localStorage.getItem('jcpd_deficit_cleared_seen') === 'true') return '';
+  const bal = cumulativeBalance(state);
+  if (bal < 0) return '';
+  const todayWk = getWeekKey(new Date());
+  const pastWks = Object.keys(state.weeks)
+    .filter(wk => wk < todayWk && !state.weeks[wk].excludeFromCtap)
+    .sort();
+  if (pastWks.length < 1) return '';
+  const lastWk = state.weeks[pastWks[pastWks.length - 1]];
+  const lastContrib = weekCreditHours(lastWk) - adjustedTargetHours(state, lastWk);
+  const prevBal = bal - lastContrib;
+  if (prevBal >= 0) return '';
+  return `<div class="coach-card coach-card-celebration" id="deficit-cleared-card">
+    <button class="coach-card-dismiss" id="dismiss-deficit-cleared">✕</button>
+    <div class="coach-celebrate-check">✓</div>
+    <div class="coach-msg">You're back in credit. ${pastWks.length} week${pastWks.length === 1 ? '' : 's'} of consistent work got you here — well done.</div>
+  </div>`;
+}
+
+function buildCoachLogBanner() {
+  if (!isCoachModeOn()) return '';
+  if (activeLogDay !== getTodayKey()) return '';
+  const todayWk = getWeekKey(new Date());
+  const week = state.weeks[todayWk] || { days: {} };
+  const todayKey = getTodayKey();
+  const dedMins = (week.deductionLog || []).filter(d => d.date === todayKey).reduce((s,d) => s+d.mins, 0);
+  const dailyTarget = Math.max(0, getDailyTarget(state, week, todayKey) - dedMins / 60);
+  if (dailyTarget <= 0) return '';
+  const todayHours = ((week.days || {})[todayKey] || []).reduce((s,j) => s+j.creditMins, 0) / 60;
+  if (todayHours >= dailyTarget) return '';
+  const gap = dailyTarget - todayHours;
+  const all = [...JOB_TYPES.core, ...JOB_TYPES.hive, ...JOB_TYPES.sales];
+  const fixed = all.filter(j => !j.variable && !j.isMentorFull && !j.isMentorPartial && !j.isNpt && j.minutes > 0);
+  const bestJob = fixed.reduce((b, j) => j.minutes > b.minutes ? j : b, fixed[0]);
+  let text = '';
+  if (gap <= 1.0 + 0.05) {
+    const closing = fixed
+      .filter(j => Math.abs(j.minutes/60 - gap) < 0.6)
+      .sort((a,b) => Math.abs(a.minutes/60 - gap) - Math.abs(b.minutes/60 - gap))[0] || bestJob;
+    if (closing) {
+      const n = closing.name.replace(/\s*\(.*$/, '').trim();
+      text = `${gap.toFixed(2)}h to hit today's target — a ${n} (${(closing.minutes/60).toFixed(2)}h) would get you there.`;
+    }
+  } else if (bestJob) {
+    text = `Best opportunity: ${bestJob.name.replace(/\s*\(.*$/, '').trim()} — ${(bestJob.minutes/60).toFixed(2)}h`;
+  }
+  if (!text) return '';
+  return `<div class="coach-log-banner">${text}</div>`;
 }
 
 // ── Utils ──────────────────────────────────────────────────────────────────
