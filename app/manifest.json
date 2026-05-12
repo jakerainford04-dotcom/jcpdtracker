@@ -1,7 +1,7 @@
 {
-  "name": "Job Credits Per Day Tracker",
-  "short_name": "JCPD",
-  "description": "Track weekly job credits against your bonus target",
+  "name": "CTAP Tracker",
+  "short_name": "CTAP",
+  "description": "Track your Credit Time Achievement Performance against your weekly bonus target",
   "start_url": "/jcpdtracker/",
   "scope": "/jcpdtracker/",
   "display": "standalone",

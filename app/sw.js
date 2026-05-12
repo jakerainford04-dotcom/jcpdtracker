@@ -1,4 +1,4 @@
-const CACHE  = 'jct-v8';
+const CACHE  = 'jct-v11';
 const BASE   = '/jcpdtracker';
 const ASSETS = [
   BASE + '/',

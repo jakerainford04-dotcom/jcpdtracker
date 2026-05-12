@@ -8,10 +8,11 @@ let lastGreeting = '';
 let weekSummaryKey = null;
 let forecastSheetOpen = false;
 let activeDayKey = null;
-let pendingTimeEntry = null;
 let dayEditMode = false;
 let activeLogDay = getTodayKey();
 let jobSearch = '';
+let ctapProjectedMode = false;
+let graphWeekKey = getWeekKey(new Date());
 
 // ── Init ───────────────────────────────────────────────────────────────────
 window.addEventListener('error', function(e) {
@@ -46,14 +47,6 @@ function buildApp() {
     ${buildWeekForecastSheet()}
     ${buildWeekSummarySheet()}
     <div class="toast" id="toast"></div>
-    <div class="time-toast hidden" id="time-toast">
-      <div class="time-toast-label">Add a start time? <span class="time-toast-opt">(optional)</span></div>
-      <input type="time" id="time-toast-input" class="time-toast-input">
-      <div class="time-toast-btns">
-        <button class="time-toast-skip" id="time-toast-skip">Skip</button>
-        <button class="time-toast-save" id="time-toast-save">Save</button>
-      </div>
-    </div>
   `;
 }
 
@@ -64,7 +57,7 @@ function buildTopBar() {
   return `
     <header class="top-bar">
       <div class="top-title">
-        <div class="top-title-main">JCPD Tracker</div>
+        <div class="top-title-main">CTAP Tracker</div>
         <div class="top-title-sub">Service + Repair</div>
       </div>
       ${activeTab === 'dashboard' ? `<div class="week-nav">
@@ -126,10 +119,15 @@ function buildDashboard() {
 
   // ── CTAP balance ──
   const bal = cumulativeBalance(state);
-  const balColour = bal >= 0 ? 'green' : 'red';
-  const balAbs = Math.abs(bal);
-  const balSign = bal < 0 ? '-' : '+';
-  const balSignColour = bal < 0 ? 'red' : 'green';
+  // Projected = actual + current week's contribution as if it closed now
+  const projectedBal = isCurrentWeek
+    ? bal + weekCreditHours(week) - adjustedTargetHours(state, week)
+    : bal;
+  const displayBal = isCurrentWeek && ctapProjectedMode ? projectedBal : bal;
+  const balColour = displayBal >= 0 ? 'green' : 'red';
+  const balAbs = Math.abs(displayBal);
+  const balSign = displayBal < 0 ? '-' : '+';
+  const balSignColour = displayBal < 0 ? 'red' : 'green';
   const balIntNum = Math.floor(balAbs);
   const balDecStr = (balAbs % 1).toFixed(2).slice(1);
 
@@ -137,9 +135,8 @@ function buildDashboard() {
   const allDed = week.deductionLog || [];
   const allDedIndexed = allDed.map((d, i) => ({ ...d, logIdx: i }));
   const todayDeds = allDedIndexed.filter(d => d.date === todayKey);
-  const prevDeds  = allDedIndexed.filter(d => d.date !== todayKey);
   const todayMentor = (week.mentorDays || {})[todayKey];
-  const hasAny = todayJobs.length > 0 || allDedIndexed.length > 0 || !!todayMentor;
+  const hasAny = todayJobs.length > 0 || todayDeds.length > 0 || !!todayMentor;
   const prevDayHours = Math.max(0, earnedHours - todayHours);
   const hasPrevDayJobs = prevDayHours > 0.001;
 
@@ -262,17 +259,18 @@ function buildDashboard() {
 
     <div class="ctap-hero-card">
       <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
-        <div class="ctap-hero-label">CTAP Balance</div>
-        <span class="status-badge ${balColour}" style="font-size:0.58rem;padding:2px 8px">${bal >= 0 ? 'In credit' : 'Deficit'}</span>
+        <div class="ctap-hero-label">CTAP Balance${isCurrentWeek && ctapProjectedMode ? ' <span class="ctap-proj-badge">PROJECTED</span>' : ''}</div>
+        <span class="status-badge ${balColour}" style="font-size:0.58rem;padding:2px 8px">${displayBal >= 0 ? 'In credit' : 'Deficit'}</span>
       </div>
       <div class="ctap-number-row">
         <span class="ctap-numblock">
-          <span class="ctap-sign ${balSignColour}">${balSign}</span><span class="ctap-int ${bal >= 0 ? 'green' : ''}">${balIntNum}</span><span class="ctap-dec">${balDecStr}</span>
+          <span class="ctap-sign ${balSignColour}">${balSign}</span><span class="ctap-int ${displayBal >= 0 ? 'green' : ''}">${balIntNum}</span><span class="ctap-dec">${balDecStr}</span>
         </span>
         <span class="ctap-unit">HRS</span>
       </div>
-      <div style="display:flex;justify-content:flex-end;margin-top:8px">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-top:8px">
         <span style="font-size:0.62rem;color:var(--muted)">Starting balance: <span style="font-weight:600;color:var(--muted)">${(state.startingBalance || 0) >= 0 ? '+' : ''}${(state.startingBalance || 0).toFixed(2)}h</span></span>
+        ${isCurrentWeek ? `<button id="ctap-proj-toggle" class="ctap-proj-btn${ctapProjectedMode ? ' active' : ''}">${ctapProjectedMode ? 'Projected' : 'Actual'}</button>` : ''}
       </div>
     </div>
 
@@ -332,26 +330,18 @@ function buildDashboard() {
               <span class="job-credits" style="color:var(--accent)">${todayMentor === 'full' ? 'Target 0h' : '−20%'}</span>
               <button class="del-mentor-btn" data-day="${todayKey}" title="Remove">×</button>
             </div>` : '')
-            + prevDeds.map(d => {
-              const dl = new Date(d.date + 'T00:00:00').toLocaleDateString('en-GB', { weekday: 'short' }).toUpperCase();
-              return `<div class="job-entry">
-                <span class="job-ts">${dl}</span>
-                <span class="job-name" style="color:var(--amber)">${d.name}</span>
-                <span class="job-credits" style="color:var(--amber)">-${(d.mins / 60).toFixed(2)}h</span>
-                <button class="del-btn del-ded-btn" data-ded-idx="${d.logIdx}" title="Remove">×</button>
-              </div>`;
-            }).join('')
           : '<div class="empty" style="padding:10px 0">No jobs logged today</div>'
         }
         ${hasPrevDayJobs ? `
           <div style="margin-top:8px;padding-top:8px;border-top:0.5px solid var(--sep);display:flex;justify-content:space-between;align-items:center">
             <span style="font-size:0.72rem;color:var(--muted)">Earlier this week</span>
-            <span style="font-size:0.78rem;font-weight:600;color:var(--accent)">+${prevDayHours.toFixed(2)}h — see History tab</span>
+            <button id="go-history-tab" style="background:none;border:none;padding:0;font-size:0.78rem;font-weight:600;color:var(--accent);cursor:pointer;-webkit-tap-highlight-color:transparent">+${prevDayHours.toFixed(2)}h — see History tab</button>
           </div>` : ''}
       </div>
     </details>
 
     ${buildInsightsCard(dailyTargetHours, todayHours, targetHours, earnedHours, todayPFMins)}
+    ${buildCreditGraph()}
   `;
 }
 
@@ -434,6 +424,94 @@ function buildBalanceCard() {
   const colour = bal >= 0 ? 'green' : 'red';
   const sign = n => (n >= 0 ? '+' : '') + n.toFixed(2);
   return `<span style="color:var(--${colour})">${sign(bal)}h</span>`;
+}
+
+function buildCreditGraph() {
+  const todayKey     = getTodayKey();
+  const todayWk      = getWeekKey(new Date());
+  const week         = state.weeks[graphWeekKey] || { days: {} };
+  const days         = weekDays(graphWeekKey);
+  const DAY_ABBR     = ['M', 'T', 'W', 'T', 'F', 'S', 'S'];
+  const isGrCurrent  = graphWeekKey === todayWk;
+  const isFutureWeek = graphWeekKey > todayWk;
+
+  const dayData = days.map(dk => {
+    const jobs = (week.days || {})[dk] || [];
+    return { cr: jobs.reduce((s, j) => s + j.creditMins, 0) / 60, count: jobs.length };
+  });
+  const dayCredits = dayData.map(d => d.cr);
+
+  const dailyRef = state.baseHours / 5;
+  const maxCred  = Math.max(...dayCredits, dailyRef, 0.01);
+  const maxY     = maxCred * 1.25;
+
+  // SVG layout
+  const W = 300, H = 110;
+  const lm = 6, rm = 6, tm = 14, bm = 22;
+  const cw = W - lm - rm;
+  const ch = H - tm - bm;
+
+  const xi = i => lm + (i / 6) * cw;
+  const yv = v => tm + ch - (Math.min(v, maxY) / maxY) * ch;
+
+  const targetY = yv(dailyRef).toFixed(1);
+
+  // Only draw dots/line for days that have passed or equal today
+  const visibleDots = days.map((dk, i) => {
+    if (isFutureWeek) return null;
+    if (isGrCurrent && dk > todayKey) return null;
+    return { i, dk, cr: dayData[i].cr, count: dayData[i].count };
+  }).filter(Boolean);
+
+  const linePoints = visibleDots.map(({ i, cr }) =>
+    `${xi(i).toFixed(1)},${yv(cr).toFixed(1)}`
+  ).join(' ');
+
+  // Week navigation bounds
+  const prevGrDate = new Date(graphWeekKey + 'T00:00:00');
+  prevGrDate.setDate(prevGrDate.getDate() - 7);
+  const prevGrKey  = getWeekKey(prevGrDate);
+  const nextGrDate = new Date(graphWeekKey + 'T00:00:00');
+  nextGrDate.setDate(nextGrDate.getDate() + 7);
+  const nextGrKey  = getWeekKey(nextGrDate);
+  const canGoNext  = nextGrKey <= todayWk;
+  const allWkKeys  = Object.keys(state.weeks).sort();
+  const canGoPrev  = allWkKeys.length > 0 && prevGrKey >= allWkKeys[0];
+
+  const hasData = visibleDots.some(d => d.cr > 0);
+
+  return `
+    <div class="credit-graph-card dashboard-card">
+      <div class="credit-graph-header">
+        <span class="credit-graph-title">Daily Credits</span>
+        <div class="credit-graph-nav">
+          <button class="graph-week-btn" id="graph-prev-week" ${!canGoPrev ? 'disabled' : ''}>&#8249;</button>
+          <span class="graph-week-label">${weekLabel(graphWeekKey)}</span>
+          <button class="graph-week-btn" id="graph-next-week" ${!canGoNext ? 'disabled' : ''}>&#8250;</button>
+        </div>
+      </div>
+      <svg viewBox="0 0 ${W} ${H}" class="credit-graph-svg" preserveAspectRatio="none">
+        <line x1="${lm}" y1="${(tm + ch / 2).toFixed(0)}" x2="${W - rm}" y2="${(tm + ch / 2).toFixed(0)}" class="graph-grid-line"/>
+        <line x1="${lm}" y1="${targetY}" x2="${W - rm}" y2="${targetY}" class="graph-target-line"/>
+        <text x="${W - rm - 1}" y="${(parseFloat(targetY) - 2).toFixed(0)}" class="graph-target-lbl" text-anchor="end">${dailyRef.toFixed(1)}h</text>
+        ${visibleDots.length >= 2 ? `<polyline points="${linePoints}" class="graph-line"/>` : ''}
+        ${visibleDots.map(({ i, dk, cr, count }) => {
+          const isToday = isGrCurrent && dk === todayKey;
+          const aboveRef = cr >= dailyRef - 0.01;
+          const dotCls = cr === 0 ? 'graph-dot graph-dot-zero' : aboveRef ? 'graph-dot graph-dot-above' : 'graph-dot';
+          const cx = xi(i).toFixed(1), cy = yv(cr).toFixed(1);
+          return `<circle cx="${cx}" cy="${cy}" r="${isToday ? '5' : '4'}" class="${dotCls}${isToday ? ' graph-dot-today' : ''}"/>
+          <circle cx="${cx}" cy="${cy}" r="14" fill="transparent" class="graph-dot-hit" data-day="${dk}" data-jobs="${count}"/>`;
+        }).join('')}
+        ${days.map((dk, i) => {
+          const isToday = isGrCurrent && dk === todayKey;
+          return `<text x="${xi(i).toFixed(1)}" y="${H - 5}" class="graph-day-lbl${isToday ? ' graph-day-today' : ''}" text-anchor="middle">${DAY_ABBR[i]}</text>`;
+        }).join('')}
+      </svg>
+      ${isFutureWeek ? `<p class="graph-empty-msg">Future week — no data yet</p>` : (!hasData ? `<p class="graph-empty-msg">No jobs logged this week</p>` : '')}
+      <div class="graph-day-info" id="graph-day-info"></div>
+    </div>
+  `;
 }
 
 function buildInsightsCard(dailyTarget, todayHours, weekTarget, weekEarned, todayPFMins) {
@@ -1085,10 +1163,13 @@ function buildSettings() {
       <div class="settings-group" style="margin-top:12px">
         <div class="coach-toggle-row">
           <div style="flex:1;min-width:0">
-            <label>Coach Mode</label>
+            <label>Coach Mode <span class="beta-badge">BETA</span></label>
             <p class="settings-note" style="margin-top:3px">Surfaces personalised tips and targets to help you perform at your best</p>
           </div>
-          <button class="coach-mode-toggle${coachOn ? ' active' : ''}" id="coach-mode-toggle">${coachOn ? 'On' : 'Off'}</button>
+          <label class="coach-slider-wrap">
+            <input type="checkbox" id="coach-mode-toggle"${coachOn ? ' checked' : ''}>
+            <span class="coach-slider"></span>
+          </label>
         </div>
       </div>
       <div class="settings-group" style="margin-top:12px">
@@ -1190,6 +1271,10 @@ function buildSettings() {
         <br>
         All data is stored locally on this device.
       </p>
+      <div class="about-watermark">
+        <p class="about-watermark-name">Created &amp; designed by Jake Rainford</p>
+        <p class="about-watermark-contact">Questions or suggestions? <a href="mailto:jake.rainford@britishgas.co.uk" class="about-watermark-link">jake.rainford@britishgas.co.uk</a></p>
+      </div>
     </div>
   `;
 }
@@ -1203,10 +1288,6 @@ function buildModal() {
         <p id="modal-desc"></p>
         <input type="number" id="modal-input" min="1" step="1" placeholder="0">
         <input type="text" id="modal-name" placeholder="Reason (optional)" style="display:none;margin-top:10px;width:100%;background:var(--surface2);border:none;border-radius:10px;color:var(--fg);font-size:0.9rem;padding:10px 12px;outline:none;box-sizing:border-box;-webkit-appearance:none">
-        <div class="modal-time-row">
-          <span class="modal-time-label">Start time <span class="modal-time-opt">(optional)</span></span>
-          <input type="time" id="modal-time" class="modal-time-input">
-        </div>
         <div class="modal-btns">
           <button class="btn-cancel" id="modal-cancel">Cancel</button>
           <button class="btn-confirm" id="modal-confirm">Log Job</button>
@@ -1415,7 +1496,8 @@ function handleSheetInteraction(e) {
       }
     }
     saveState(state);
-    render();
+    const sheetEl = del.closest('#forecast-sheet') || del.closest('#week-summary-sheet');
+    if (sheetEl) refreshSheetInPlace(sheetEl.id);
   }
 }
 
@@ -1587,6 +1669,23 @@ function closeForecastSheet() {
   forecastSheetOpen = false;
   dayEditMode = false;
   document.getElementById('forecast-sheet').classList.add('hidden');
+  render();
+}
+
+// Swap just the panel's inner content without touching the panel element itself,
+// so the slideUp animation doesn't re-fire on every deletion.
+function refreshSheetInPlace(sheetId) {
+  const sheet = document.getElementById(sheetId);
+  if (!sheet) return;
+  const panel = sheet.querySelector('.forecast-panel');
+  if (!panel) return;
+  const tmp = document.createElement('div');
+  tmp.innerHTML = sheetId === 'forecast-sheet' ? buildWeekForecastSheet() : buildWeekSummarySheet();
+  const newPanel = tmp.querySelector('.forecast-panel');
+  if (!newPanel) return;
+  const scrollTop = panel.scrollTop;
+  panel.innerHTML = newPanel.innerHTML;
+  panel.scrollTop = scrollTop;
 }
 
 // ── Week Summary Sheet ─────────────────────────────────────────────────────
@@ -1787,6 +1886,7 @@ function closeWeekSummary() {
   dayEditMode = false;
   const el = document.getElementById('week-summary-sheet');
   if (el) el.classList.add('hidden');
+  render();
 }
 
 // ── Listeners ──────────────────────────────────────────────────────────────
@@ -1827,7 +1927,7 @@ function attachListeners() {
     btn.addEventListener('click', () => {
       weekSummaryKey = null;
       activeTab = btn.dataset.tab;
-      if (activeTab === 'dashboard') currentWeekKey = getWeekKey(new Date());
+      if (activeTab === 'dashboard') { currentWeekKey = getWeekKey(new Date()); ctapProjectedMode = false; }
       if (activeTab === 'log') { activeLogDay = getTodayKey(); jobSearch = ''; }
       render();
     });
@@ -1930,8 +2030,7 @@ function attachListeners() {
       } else {
         btn.classList.add('logged');
         setTimeout(() => btn.classList.remove('logged'), 380);
-        const result = logJob(job, null);
-        if (result) showTimePicker(result.weekKey, result.dayKey, result.idx);
+        logJob(job, null);
       }
     });
   });
@@ -2079,9 +2178,60 @@ function attachListeners() {
 
   // Coach mode toggle
   const coachToggle = document.getElementById('coach-mode-toggle');
-  if (coachToggle) coachToggle.addEventListener('click', () => {
-    localStorage.setItem('jcpd_coach_mode', isCoachModeOn() ? 'false' : 'true');
+  if (coachToggle) coachToggle.addEventListener('change', () => {
+    localStorage.setItem('jcpd_coach_mode', coachToggle.checked ? 'true' : 'false');
     render();
+  });
+
+  // "Earlier this week" → History tab
+  const goHistoryBtn = document.getElementById('go-history-tab');
+  if (goHistoryBtn) goHistoryBtn.addEventListener('click', () => {
+    activeTab = 'history';
+    render();
+  });
+
+  // CTAP projected toggle
+  const ctapProjToggle = document.getElementById('ctap-proj-toggle');
+  if (ctapProjToggle) ctapProjToggle.addEventListener('click', () => {
+    ctapProjectedMode = !ctapProjectedMode;
+    render();
+  });
+
+  // Credit graph dot tap — show job count
+  const graphCard = document.querySelector('.credit-graph-card');
+  if (graphCard) {
+    graphCard.addEventListener('click', e => {
+      const hit = e.target.closest('.graph-dot-hit');
+      if (!hit) return;
+      const info = document.getElementById('graph-day-info');
+      if (!info) return;
+      const dk = hit.dataset.day;
+      const count = parseInt(hit.dataset.jobs, 10);
+      if (info.dataset.activeDay === dk && info.textContent) {
+        info.textContent = '';
+        info.dataset.activeDay = '';
+      } else {
+        const dayName = new Date(dk + 'T00:00:00').toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'short' });
+        info.textContent = `${dayName} — ${count} ${count === 1 ? 'job' : 'jobs'}`;
+        info.dataset.activeDay = dk;
+      }
+    });
+  }
+
+  // Credit graph week navigation
+  const graphPrev = document.getElementById('graph-prev-week');
+  const graphNext = document.getElementById('graph-next-week');
+  if (graphPrev) graphPrev.addEventListener('click', () => {
+    const d = new Date(graphWeekKey + 'T00:00:00');
+    d.setDate(d.getDate() - 7);
+    graphWeekKey = getWeekKey(d);
+    render();
+  });
+  if (graphNext) graphNext.addEventListener('click', () => {
+    const d = new Date(graphWeekKey + 'T00:00:00');
+    d.setDate(d.getDate() + 7);
+    const nk = getWeekKey(d);
+    if (nk <= getWeekKey(new Date())) { graphWeekKey = nk; render(); }
   });
 
   // Dismiss deficit-cleared celebration card
@@ -2179,28 +2329,45 @@ function attachListeners() {
   const summaryBackdrop = document.getElementById('summary-backdrop');
   if (summaryBackdrop) summaryBackdrop.addEventListener('click', closeWeekSummary);
 
-  // Time toast (quick start-time entry after fixed job log)
-  const timeToastSave = document.getElementById('time-toast-save');
-  const timeToastSkip = document.getElementById('time-toast-skip');
-  if (timeToastSave) timeToastSave.addEventListener('click', () => {
-    if (pendingTimeEntry) {
-      const input = document.getElementById('time-toast-input');
-      const timeVal = input ? input.value : '';
-      if (timeVal) {
-        const { weekKey, dayKey, idx } = pendingTimeEntry;
-        const wk = state.weeks[weekKey];
-        if (wk && (wk.days || {})[dayKey] && wk.days[dayKey][idx] !== undefined) {
-          const [h, m] = timeVal.split(':').map(Number);
-          const d = new Date(dayKey + 'T00:00:00');
-          d.setHours(h, m, 0, 0);
-          wk.days[dayKey][idx].startTime = d.toISOString();
-          saveState(state);
-        }
+  // Swipe-down-to-close for both sheets
+  function addSheetSwipe(panel, closeFn) {
+    if (!panel) return;
+    let startY = 0, startScrollTop = 0, active = false;
+    panel.addEventListener('touchstart', e => {
+      startY = e.touches[0].clientY;
+      startScrollTop = panel.scrollTop;
+      active = false;
+    }, { passive: true });
+    panel.addEventListener('touchmove', e => {
+      const dy = e.touches[0].clientY - startY;
+      if (!active) {
+        if (dy > 6 && startScrollTop === 0) active = true;
+        else return;
       }
-    }
-    hideTimePicker();
-  });
-  if (timeToastSkip) timeToastSkip.addEventListener('click', hideTimePicker);
+      if (dy > 0) {
+        panel.style.transition = 'none';
+        panel.style.transform = `translateY(${dy}px)`;
+      }
+    }, { passive: true });
+    panel.addEventListener('touchend', e => {
+      if (!active) return;
+      const dy = e.changedTouches[0].clientY - startY;
+      active = false;
+      if (dy > 80) {
+        panel.style.transition = 'transform 0.22s ease-out';
+        panel.style.transform = `translateY(100%)`;
+        setTimeout(() => { panel.style.transform = ''; panel.style.transition = ''; closeFn(); }, 220);
+      } else {
+        panel.style.transition = 'transform 0.25s cubic-bezier(0.32,0.72,0,1)';
+        panel.style.transform = '';
+        setTimeout(() => { panel.style.transition = ''; }, 260);
+      }
+    });
+  }
+  const forecastPanel = document.querySelector('#forecast-sheet .forecast-panel');
+  const summaryPanel  = document.querySelector('#week-summary-sheet .forecast-panel');
+  addSheetSwipe(forecastPanel, closeForecastSheet);
+  addSheetSwipe(summaryPanel,  closeWeekSummary);
 
   // Modal
   const overlay = document.getElementById('modal-overlay');
@@ -2214,8 +2381,7 @@ function attachListeners() {
     const val = parseFloat(modalInput.value);
     if (!val || val <= 0) { modalInput.focus(); return; }
     const nameVal = (document.getElementById('modal-name').value || '').trim();
-    const timeVal = (document.getElementById('modal-time').value || '').trim();
-    logJob(pendingJob, val, nameVal, timeVal || null);
+    logJob(pendingJob, val, nameVal);
     closeModal();
   });
   if (modalInput) {
@@ -2244,9 +2410,6 @@ function openModal(job) {
   nameField.value = '';
   nameField.style.display = (job.isNpt && !job.skipNameField) ? 'block' : 'none';
   document.getElementById('modal-confirm').textContent = job.confirmLabel || (job.isNpt ? 'Log Absence' : 'Log Job');
-  const now = new Date();
-  const timeField = document.getElementById('modal-time');
-  if (timeField) timeField.value = `${String(now.getHours()).padStart(2,'0')}:${String(now.getMinutes()).padStart(2,'0')}`;
   overlay.classList.remove('hidden');
   setTimeout(() => input.focus(), 100);
 }
@@ -2256,7 +2419,7 @@ function closeModal() {
   pendingJob = null;
 }
 
-function logJob(job, variableValue, optionalName, startTimeStr) {
+function logJob(job, variableValue, optionalName) {
   const targetDay = activeLogDay;
   const targetWeekKey = getWeekKey(new Date(targetDay + 'T00:00:00'));
 
@@ -2325,13 +2488,6 @@ function logJob(job, variableValue, optionalName, startTimeStr) {
     ts: Date.now()
   };
 
-  if (startTimeStr) {
-    const [h, m] = startTimeStr.split(':').map(Number);
-    const d = new Date(targetDay + 'T00:00:00');
-    d.setHours(h, m, 0, 0);
-    entry.startTime = d.toISOString();
-  }
-
   const week = getOrCreateWeek(state, targetWeekKey);
   const day = getOrCreateDay(week, targetDay);
   day.push(entry);
@@ -2340,27 +2496,7 @@ function logJob(job, variableValue, optionalName, startTimeStr) {
   const displayName = job.name.replace(/\s*\(.*$/, '');
   const backfillNote = targetDay !== getTodayKey() ? ' (backdated)' : '';
   showToast(displayName + ' added' + backfillNote);
-  if (activeTab === 'log') {
-    // Stay on log tab, just show toast
-  } else {
-    render();
-  }
-  return { weekKey: targetWeekKey, dayKey: targetDay, idx: day.length - 1 };
-}
-
-function showTimePicker(weekKey, dayKey, idx) {
-  pendingTimeEntry = { weekKey, dayKey, idx };
-  const now = new Date();
-  const input = document.getElementById('time-toast-input');
-  if (input) input.value = `${String(now.getHours()).padStart(2,'0')}:${String(now.getMinutes()).padStart(2,'0')}`;
-  const toast = document.getElementById('time-toast');
-  if (toast) toast.classList.remove('hidden');
-}
-
-function hideTimePicker() {
-  pendingTimeEntry = null;
-  const toast = document.getElementById('time-toast');
-  if (toast) toast.classList.add('hidden');
+  if (activeTab !== 'log') render();
 }
 
 // ── Coach Mode ─────────────────────────────────────────────────────────────
