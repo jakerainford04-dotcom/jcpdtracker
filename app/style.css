@@ -93,7 +93,7 @@ body.light .top-bar .week-nav button { background: #e5e5ea; color: var(--accent)
 body.light .job-btn { background: #ffffff; }
 body.light .job-btn.logged { background: var(--accent); }
 body.light .shift-input, body.light select.shift-input { background: #f2f2f7; color: #000000; border: 1px solid #c7c7cc; }
-body.light .tab-bar button { background: #e5e5ea; color: #3c3c43; }
+body.light .tab-bar button { background: transparent; color: var(--jcpd-ink-2); }
 body.light .tab-bar button.active { background: var(--accent); color: var(--jcpd-accent-ink); }
 body.light .status-badge.green { background: rgba(52,199,89,0.12); }
 body.light .status-badge.red   { background: rgba(255,59,48,0.12); }
@@ -428,19 +428,20 @@ body {
 /* ── Log Jobs ── */
 .tab-bar {
   display: flex;
-  background: var(--surface2);
-  border-radius: var(--radius-sm);
-  padding: 3px;
-  gap: 2px;
+  background: var(--surface);
+  border-radius: 14px;
+  border: 1px solid var(--tile-border);
+  padding: 4px;
+  gap: 3px;
   margin-bottom: 12px;
 }
 .tab-bar button {
   flex: 1;
-  background: none;
+  background: transparent;
   border: none;
   color: var(--muted);
-  padding: 7px 4px;
-  border-radius: 8px;
+  padding: 8px 4px;
+  border-radius: 10px;
   font-size: 0.78rem;
   font-weight: 600;
   cursor: pointer;
