@@ -1,15 +1,16 @@
-const CACHE = 'jct-v14';
+const CACHE = 'jct-v15';
 const BASE  = '/jcpdtracker';
-const ASSETS = [
-  BASE + '/',
-  BASE + '/index.html',
-  BASE + '/app.js',
-  BASE + '/style.css',
-  BASE + '/data.js',
-];
 
 self.addEventListener('install', e => {
-  e.waitUntil(caches.open(CACHE).then(c => c.addAll(ASSETS)));
+  // Minimal precache — only URLs guaranteed to exist
+  e.waitUntil(
+    caches.open(CACHE).then(c => c.addAll([
+      BASE + '/',
+      BASE + '/index.html',
+      BASE + '/app.js',
+      BASE + '/data.js',
+    ]))
+  );
   self.skipWaiting();
 });
 
@@ -21,12 +22,11 @@ self.addEventListener('activate', e => {
   );
 });
 
-// Network-first: always try the network, fall back to cache
+// Network-first: always try network, fall back to cache when offline
 self.addEventListener('fetch', e => {
   e.respondWith(
     fetch(e.request)
       .then(res => {
-        // Cache successful responses
         if (res.ok) {
           const clone = res.clone();
           caches.open(CACHE).then(c => c.put(e.request, clone));
