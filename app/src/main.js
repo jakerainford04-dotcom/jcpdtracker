@@ -133,27 +133,39 @@ async function bootApp(user, displayName) {
 // ── Session check + entry point ────────────────────────────────────────────
 
 async function init() {
-  // Check for existing session
-  const { data: { session } } = await supabase.auth.getSession();
+  showLoading('Starting up…');
 
-  if (session) {
-    await bootApp(session.user);
-  } else {
-    showAuthScreen(async (user, _unused, name) => {
-      // name is the display name from the signup form (null on login)
-      await bootApp(user, name || '');
-    });
-  }
+  try {
+    const { data: { session }, error: sessErr } = await supabase.auth.getSession();
+    if (sessErr) throw sessErr;
 
-  // Listen for auth state changes (sign out, session expiry)
-  supabase.auth.onAuthStateChange((event, session) => {
-    if (event === 'SIGNED_OUT' || (!session && event !== 'INITIAL_SESSION')) {
-      _currentUser = null;
+    hideLoading();
+
+    if (session) {
+      await bootApp(session.user);
+    } else {
       showAuthScreen(async (user, _unused, name) => {
         await bootApp(user, name || '');
       });
     }
-  });
+
+    // Listen for auth state changes (sign out, session expiry)
+    supabase.auth.onAuthStateChange((event, session) => {
+      if (event === 'SIGNED_OUT' || (!session && event !== 'INITIAL_SESSION')) {
+        _currentUser = null;
+        showAuthScreen(async (user, _unused, name) => {
+          await bootApp(user, name || '');
+        });
+      }
+    });
+  } catch (e) {
+    hideLoading();
+    document.getElementById('app').innerHTML = `
+      <div style="padding:24px;color:#ef4444;background:#1e293b;margin:16px;border-radius:12px;font-family:monospace;font-size:13px">
+        <b>Startup error</b><br>${e.message}<br><br>
+        <button onclick="location.reload()" style="padding:8px 16px;background:#334155;color:#fff;border:none;border-radius:6px;cursor:pointer">Retry</button>
+      </div>`;
+  }
 }
 
 init();
