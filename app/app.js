@@ -2490,7 +2490,6 @@ function attachListeners() {
         }
       }
       currentWeekKey = wk;
-      activeTab = 'dashboard';
       weekSummaryKey = wk < getWeekKey(new Date()) ? wk : null;
       if (weekSummaryKey) activeDayKey = weekDays(wk)[0];
       render();
