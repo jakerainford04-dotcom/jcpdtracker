@@ -246,6 +246,8 @@ body {
   cursor: pointer;
   list-style: none;
   -webkit-appearance: none;
+  padding: 0;
+  margin: 0;
   font-size: 0.67rem;
   font-weight: 600;
   text-transform: uppercase;
@@ -389,7 +391,7 @@ body {
   font-size: 0.83rem;
 }
 .job-entry:last-child { border-bottom: none; }
-.job-entry .job-name    { color: var(--text); flex: 1; padding-right: 8px; line-height: 1.35; }
+.job-entry .job-name    { color: var(--text); flex: 1; padding-right: 8px; line-height: 1.35; font-weight: 700; }
 .job-entry .job-credits { display: inline-flex; align-items: center; background: var(--jcpd-accent-dim); color: var(--accent); font-weight: 600; white-space: nowrap; font-size: 0.72rem; padding: 3px 9px; border-radius: 99px; }
 .job-entry .del-btn,
 .job-entry .del-mentor-btn {
