@@ -454,14 +454,15 @@ body {
 .job-grid {
   display: grid;
   grid-template-columns: 1fr 1fr;
+  grid-auto-rows: 124px;
   gap: 10px;
 }
 .job-btn {
-  height: 124px;
-  box-sizing: border-box;
   display: flex;
   flex-direction: column;
   padding: 12px 14px;
+  min-width: 0;
+  overflow: hidden;
   background: var(--surface);
   border-radius: 14px;
   border: 1px solid var(--tile-border);

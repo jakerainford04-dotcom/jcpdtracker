@@ -81,12 +81,7 @@ function buildJobTileHTML(j) {
     : j.isMentorFull ? 'Full day'
     : j.isMentorPartial ? '−20% target'
     : `+${(j.minutes / 60).toFixed(2)}h`;
-  return `<button class="job-btn${j.variable ? ' variable' : ''}" data-job-id="${j.id}">
-    <div class="jb-title"><span class="jb-name">${shortName}</span>${j.code ? `<span class="jb-code-inline"> (${j.code})</span>` : ''}</div>
-    ${sub ? `<span class="jb-sub">${sub}</span>` : ''}
-    <span class="jb-spacer"></span>
-    <span class="jb-credits">${creditsDisplay}</span>
-  </button>`;
+  return `<button class="job-btn${j.variable ? ' variable' : ''}" data-job-id="${j.id}"><div class="jb-title"><span class="jb-name">${shortName}</span>${j.code ? `<span class="jb-code-inline"> (${j.code})</span>` : ''}</div>${sub ? `<span class="jb-sub">${sub}</span>` : ''}<span class="jb-spacer"></span><span class="jb-credits">${creditsDisplay}</span></button>`;
 }
 
 // ── Init ───────────────────────────────────────────────────────────────────
@@ -177,7 +172,6 @@ function buildTopBar() {
         <button id="prev-week" aria-label="Previous week">&#8249;</button>
         <span>${weekLabel(currentWeekKey)}${isCurrentWeek ? '<span class="week-dot">•</span>' : ''}${isFutureWeek ? '<span class="week-future-badge">FUTURE</span>' : ''}</span>
         <button id="next-week" aria-label="Next week" ${isCurrentWeek ? 'disabled style="opacity:0.3"' : ''}>&#8250;</button>
-        ${isCurrentWeek ? `<button id="ctap-proj-toggle" class="ctap-proj-btn${ctapProjectedMode ? ' active' : ''}">${ctapProjectedMode ? 'Proj' : 'Actual'}</button>` : ''}
       </div>` : ''}
     </header>
   `;
@@ -396,8 +390,9 @@ function buildDashboard() {
         </span>
         <span class="ctap-unit">HRS</span>
       </div>
-      <div style="margin-top:8px">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-top:8px">
         <span style="font-size:0.62rem;color:var(--muted)">Starting balance: <span style="font-weight:600;color:var(--muted)">${(state.startingBalance || 0) >= 0 ? '+' : ''}${(state.startingBalance || 0).toFixed(2)}h</span></span>
+        ${isCurrentWeek ? `<button id="ctap-proj-toggle" class="ctap-proj-btn${ctapProjectedMode ? ' active' : ''}">${ctapProjectedMode ? 'Projected' : 'Actual'}</button>` : ''}
       </div>
     </div>
 
