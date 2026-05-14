@@ -648,11 +648,11 @@ body {
   background: none;
   border: none;
   color: var(--fg);
-  font-size: 0.88rem;
+  font-size: 16px;
   font-weight: 600;
   font-family: inherit;
   font-variant-numeric: tabular-nums;
-  width: 48px;
+  width: 52px;
   text-align: center;
   outline: none;
   -moz-appearance: textfield;
@@ -667,42 +667,6 @@ body {
   color: var(--muted);
 }
 
-/* Settings stepper (used for target %) */
-.st-stepper {
-  display: flex;
-  align-items: center;
-  gap: 0;
-  border: 1px solid var(--tile-border);
-  border-radius: 99px;
-  overflow: hidden;
-  background: var(--surface2);
-}
-.st-step-btn {
-  background: none;
-  border: none;
-  color: var(--accent);
-  font-size: 1.2rem;
-  font-weight: 700;
-  padding: 8px 16px;
-  cursor: pointer;
-  line-height: 1;
-  min-width: 44px;
-  min-height: 44px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  -webkit-tap-highlight-color: transparent;
-}
-.st-step-btn:active { opacity: 0.6; }
-.st-step-val {
-  font-size: 0.88rem;
-  font-weight: 600;
-  color: var(--fg);
-  min-width: 44px;
-  text-align: center;
-  font-variant-numeric: tabular-nums;
-  padding: 0 4px;
-}
 
 /* Info button & popover */
 .st-info-btn {
@@ -3033,7 +2997,7 @@ details[open] .info-chevron { transform: rotate(90deg); }
 .auth-card { position: relative; }
 
 /* ── Settings account card ────────────────────────────────────────────── */
-.settings-account-card { padding: 18px 20px; }
+.settings-account-card { padding: 18px 20px; margin-top: 24px; }
 
 .settings-account-name {
   font-size: 0.95rem;
