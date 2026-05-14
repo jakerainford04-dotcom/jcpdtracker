@@ -410,7 +410,7 @@ function buildDashboard() {
           <span class="split-card-label">Today</span>
         </div>
         <div class="split-hours">${todayHours.toFixed(2)}<span class="split-unit">h</span></div>
-        <div class="split-sub">today's contribution</div>
+        <div class="split-sub">today's job credits</div>
         ${paceLine}
         <div class="progress-bar" style="margin-top:auto">
           <div class="progress-bar-fill ${weekColour}" style="width:${weekPct.toFixed(1)}%"></div>
