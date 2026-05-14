@@ -1,5 +1,5 @@
-const CACHE = 'jct-v29';
-const BASE  = '/jcpdtracker';
+const CACHE = 'jct-v30';
+const BASE  = '/ctap-tracker';
 
 self.addEventListener('install', e => {
   // Minimal precache — only URLs guaranteed to exist
