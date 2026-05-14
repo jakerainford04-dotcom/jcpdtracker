@@ -526,9 +526,11 @@ function buildSchedule() {
   return `
     <div class="st-section-label">WEEK SCHEDULE</div>
     <div class="sched-nav-row">
-      <button id="sched-prev-week" class="sched-nav-btn">&#8249;</button>
-      <span class="sched-nav-label">${schedWeekLabel(currentWeekKey)}</span>
-      <button id="sched-next-week" class="sched-nav-btn" ${schedAtCap ? 'disabled' : ''}>&#8250;</button>
+      <div class="sched-nav-week">
+        <button id="sched-prev-week" class="sched-nav-btn">&#8249;</button>
+        <span class="sched-nav-label">${schedWeekLabel(currentWeekKey)}</span>
+        <button id="sched-next-week" class="sched-nav-btn" ${schedAtCap ? 'disabled' : ''}>&#8250;</button>
+      </div>
       <button id="apply-default" class="sched-standard-btn">Standard week</button>
     </div>
     <div class="autosave-bar">

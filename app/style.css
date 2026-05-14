@@ -1722,32 +1722,36 @@ details[open] .info-chevron { transform: rotate(90deg); }
 .sched-nav-row {
   display: flex;
   align-items: center;
-  gap: 6px;
+  justify-content: space-between;
   margin-bottom: 10px;
+}
+.sched-nav-week {
+  display: flex;
+  align-items: center;
+  gap: 4px;
 }
 .sched-nav-btn {
   background: var(--surface2);
   border: none;
-  color: var(--fg);
-  font-size: 1.25rem;
+  color: var(--accent);
+  font-size: 1.2rem;
+  font-weight: 600;
   line-height: 1;
-  border-radius: 8px;
-  width: 32px;
-  height: 32px;
+  border-radius: 7px;
+  padding: 5px 12px;
   cursor: pointer;
-  display: flex;
-  align-items: center;
-  justify-content: center;
   flex-shrink: 0;
+  transition: opacity 0.15s;
+  -webkit-tap-highlight-color: transparent;
 }
 .sched-nav-btn:disabled { opacity: 0.3; cursor: default; }
 .sched-nav-label {
   font-size: 1rem;
   font-weight: 700;
   color: var(--fg);
-  flex: 1;
   white-space: nowrap;
   letter-spacing: -0.2px;
+  padding: 0 4px;
 }
 .sched-standard-btn {
   background: var(--surface2);
