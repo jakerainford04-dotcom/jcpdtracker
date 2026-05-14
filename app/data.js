@@ -190,8 +190,50 @@ function weekCreditHours(week) {
   return weekTotalCreditMins(week) / 60;
 }
 
+// Rostered hours = contracted hours minus leave and mentor adjustments
+// (travel is NOT deducted — it is accounted for in the configurable % target)
+function rosteredHours(state, week) {
+  return state.baseHours - weekLeaveHours(state, week) - weekMentorTargetReduction(state, week);
+}
+
+// Adjusted target = rostered × configured % (default 80%) minus NPT deductions
 function adjustedTargetHours(state, week) {
-  return state.baseHours - ((week.deductionMins || 0) / 60) - weekLeaveHours(state, week) - (week.travelHours || 0) - weekMentorTargetReduction(state, week);
+  const rostered = rosteredHours(state, week);
+  const pct = typeof state.weeklyTargetPct === 'number' ? state.weeklyTargetPct : 0.8;
+  const npt = (week.deductionMins || 0) / 60;
+  return Math.max(0, rostered * pct - npt);
+}
+
+// Rolling average of last 4–6 completed non-empty weeks before weekKey
+// Returns { avg, n } or null when fewer than 4 qualifying weeks exist
+function rollingAvgInfo(state, weekKey) {
+  const cutoff = weekKey || getWeekKey(new Date());
+  const qualifying = Object.keys(state.weeks)
+    .filter(wk => wk < cutoff && weekCreditHours(state.weeks[wk]) > 0)
+    .sort()
+    .slice(-6);
+  if (qualifying.length < 4) return null;
+  const avg = qualifying.reduce((s, wk) => s + weekCreditHours(state.weeks[wk]), 0) / qualifying.length;
+  return { avg, n: qualifying.length };
+}
+
+// Effective target for dashboard display:
+//   • rolling average (scaled by roster ratio) when 4+ completed weeks exist
+//   • otherwise the configured % formula
+// Returns { hours, isRolling, n, displayTarget }
+//   hours        = effective target after NPT deduction (used for progress %)
+//   displayTarget = pre-NPT figure (shown in the Rostered | Target line)
+function effectiveTargetHours(state, week, weekKey) {
+  const rostered = rosteredHours(state, week);
+  const npt = (week.deductionMins || 0) / 60;
+  const rolling = rollingAvgInfo(state, weekKey);
+  if (rolling && state.baseHours > 0) {
+    const scaledAvg = rolling.avg * (rostered / state.baseHours);
+    return { hours: Math.max(0, scaledAvg - npt), isRolling: true, n: rolling.n, displayTarget: Math.max(0, scaledAvg) };
+  }
+  const pct = typeof state.weeklyTargetPct === 'number' ? state.weeklyTargetPct : 0.8;
+  const displayTarget = rostered * pct;
+  return { hours: Math.max(0, displayTarget - npt), isRolling: false, n: 0, displayTarget };
 }
 
 function bonusAchieved(state, week) {

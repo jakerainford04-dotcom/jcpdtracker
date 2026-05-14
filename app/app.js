@@ -13,6 +13,9 @@ let activeLogDay = getTodayKey();
 let jobSearch = '';
 let ctapProjectedMode = false;
 let graphWeekKey = getWeekKey(new Date());
+let _ctapUser = null;          // populated by __ctapInit
+let _ctapDisplayName = '';     // populated by __ctapInit
+let _isOffline = false;
 
 // ── Init ───────────────────────────────────────────────────────────────────
 window.addEventListener('error', function(e) {
@@ -20,8 +23,37 @@ window.addEventListener('error', function(e) {
   if (app) app.innerHTML = '<div style="padding:20px;color:#ef4444;background:#1e293b;margin:16px;border-radius:8px;font-family:monospace;font-size:12px"><b>JS Error</b><br>' + e.message + '<br>at line ' + e.lineno + '</div>';
 });
 
+// Called by src/main.js after Supabase auth + data load
+window.__ctapInit = function(loadedState, profile, user) {
+  _ctapUser = user;
+  _ctapDisplayName = profile ? (profile.display_name || '') : '';
+  state = loadedState;
+  // Apply persisted theme/coach from profile
+  if (profile) {
+    const isLight = profile.theme === 'light';
+    document.body.classList.toggle('light', isLight);
+    localStorage.setItem('jcpd_theme', profile.theme || 'dark');
+    localStorage.setItem('jcpd_coach_mode', profile.coach_mode ? 'true' : 'false');
+  }
+  if ('serviceWorker' in navigator) {
+    navigator.serviceWorker.register('sw.js').catch(function() {});
+  }
+  render();
+};
+
+// Expose current state for sync layer
+window.__ctapGetState = function() { return state; };
+
+// Called by src/main.js when online/offline status changes
+window.__ctapSetOffline = function(offline) {
+  _isOffline = offline;
+  render();
+};
+
 document.addEventListener('DOMContentLoaded', function() {
   if (localStorage.getItem('jcpd_theme') === 'light') document.body.classList.add('light');
+  // When Supabase is active, __ctapInit drives rendering. Skip auto-render.
+  if (window.__ctapSupabaseActive) return;
   render();
   if ('serviceWorker' in navigator) {
     navigator.serviceWorker.register('sw.js').catch(function() {});
@@ -82,13 +114,13 @@ function buildMain() {
 function buildBottomNav() {
   const tabs = [
     { id: 'dashboard', label: 'Dashboard', icon: iconChart() },
-    { id: 'log',       label: 'Log Job',   icon: iconPlus() },
+    { id: 'log',       label: 'Log Job',   icon: iconPlus(), disabled: _isOffline },
     { id: 'schedule',  label: 'Schedule',  icon: iconCalendar() },
     { id: 'history',   label: 'History',   icon: iconClock() },
     { id: 'settings',  label: 'Settings',  icon: iconGear() },
   ];
   return `<nav class="bottom-nav">${tabs.map(t => `
-    <button class="${t.id === activeTab ? 'active' : ''}" data-tab="${t.id}">
+    <button class="${t.id === activeTab ? 'active' : ''}${t.disabled ? ' nav-disabled' : ''}" data-tab="${t.id}"${t.disabled ? ' aria-disabled="true"' : ''}>
       <span class="nav-icon">${t.icon}</span><span>${t.label}</span>
     </button>`).join('')}
   </nav>`;
@@ -99,12 +131,32 @@ function buildDashboard() {
   const week = getOrCreateWeek(state, currentWeekKey);
   const isCurrentWeek = currentWeekKey === getWeekKey(new Date());
 
-  // ── Weekly stats ──
+  // ── Effective weekly target (rolling avg or configured %) ──
   const earnedHours = weekCreditHours(week);
-  const targetHours = adjustedTargetHours(state, week);
-  const weekPct = targetHours > 0 ? Math.min((earnedHours / targetHours) * 100, 100) : 0;
-  const bonus = bonusAchieved(state, week);
-  const weekColour = bonus ? 'green' : (weekPct >= 80 ? 'amber' : 'red');
+  const effective = effectiveTargetHours(state, week, currentWeekKey);
+  const targetH = effective.hours;          // after NPT — used for progress %
+  const displayTargetH = effective.displayTarget; // pre-NPT — shown in Rostered|Target line
+  const isRolling = effective.isRolling;
+  const rollingN = effective.n;
+  const rosteredH = rosteredHours(state, week);
+  const allowanceH = Math.max(0, rosteredH - displayTargetH);
+  const weekPct = targetH > 0 ? Math.min((earnedHours / targetH) * 100, 100) : 0;
+  const bonus = earnedHours >= targetH;
+  // Three-band: green ≥90%, amber ≥70%, red <70%
+  const weekColour = weekPct >= 90 ? 'green' : weekPct >= 70 ? 'amber' : 'red';
+
+  // ── Trend indicator (needs ≥2 completed weeks before current) ──
+  const prevCompletedKeys = Object.keys(state.weeks).filter(wk => wk < currentWeekKey).sort();
+  const canShowTrend = prevCompletedKeys.length >= 2;
+  const prevWkKey = canShowTrend ? prevCompletedKeys[prevCompletedKeys.length - 1] : null;
+  const prevWkEarned = prevWkKey ? weekCreditHours(state.weeks[prevWkKey]) : null;
+  const trendNetChange = prevWkEarned !== null ? earnedHours - prevWkEarned : null;
+  const trendFlatThresh = prevWkEarned > 0 ? prevWkEarned * 0.05 : 0.5;
+  const trendArrow = trendNetChange === null ? '' :
+    trendNetChange > trendFlatThresh ? '↑' :
+    trendNetChange < -trendFlatThresh ? '↓' : '→';
+  const trendCls = trendArrow === '↑' ? 'green' : trendArrow === '↓' ? 'red' : 'muted';
+  const trendSign = trendNetChange !== null && trendNetChange >= 0 ? '+' : '';
 
   // ── Today's stats ──
   const todayKey = getTodayKey();
@@ -114,8 +166,6 @@ function buildDashboard() {
   const dailyTargetHours = Math.max(0, getDailyTarget(state, week, todayKey) - todayDedMins / 60);
   const todayJobs = (week.days || {})[todayKey] || [];
   const todayHours = todayJobs.reduce((s, j) => s + j.creditMins, 0) / 60;
-  const dayPct = dailyTargetHours > 0 ? Math.min((todayHours / dailyTargetHours) * 100, 100) : 0;
-  const dayColour = todayHours >= dailyTargetHours ? 'green' : (dayPct >= 80 ? 'amber' : 'red');
 
   // ── CTAP balance ──
   const bal = cumulativeBalance(state);
@@ -141,16 +191,17 @@ function buildDashboard() {
   const hasPrevDayJobs = prevDayHours > 0.001;
 
   // ── Week bar chart ──
+  // Bar height shows credits as proportion of standard daily hours — no per-day target colour
   const wDays = weekDays(currentWeekKey);
   const DAY_ABBR = ['M', 'T', 'W', 'T', 'F', 'S', 'S'];
+  const dailyRef = state.baseHours / 5;
   const weekBarsHTML = wDays.map((dk, i) => {
     const dj = (week.days || {})[dk] || [];
     const dc = dj.reduce((s, j) => s + j.creditMins, 0) / 60;
-    const dt = getDailyTarget(state, week, dk);
     const isToday = dk === todayKey;
     const isLeave = dayIsLeave(week, dk);
-    const bp = dt > 0 ? Math.min((dc / dt) * 100, 100) : (dc > 0 ? 100 : 0);
-    const cls = isLeave ? 'leave' : isToday ? 'today' : bp >= 100 ? 'done' : dc > 0 ? 'partial' : 'empty';
+    const bp = dailyRef > 0 ? Math.min((dc / dailyRef) * 100, 100) : (dc > 0 ? 100 : 0);
+    const cls = isLeave ? 'leave' : isToday ? 'today' : dc > 0 ? 'done' : 'empty';
     return `<div class="week-bar-col${isToday ? ' today' : ''}">
         <div class="week-bar-track"><div class="week-bar-fill ${cls}" style="height:${bp.toFixed(0)}%"></div></div>
         <div class="week-bar-label">${DAY_ABBR[i]}</div>
@@ -194,10 +245,11 @@ function buildDashboard() {
   };
 
   const greetHour = new Date().getHours();
-  const greeting = greetHour >= 5 && greetHour < 12 ? 'Good morning'
+  const greetName = _ctapDisplayName ? (', ' + _ctapDisplayName.split(' ')[0]) : '';
+  const greeting = (greetHour >= 5 && greetHour < 12 ? 'Good morning'
     : greetHour >= 12 && greetHour < 17 ? 'Good afternoon'
     : greetHour >= 17 && greetHour < 22 ? 'Good evening'
-    : 'Good night';
+    : 'Good night') + greetName;
   const greetDisplay = lastGreeting === greeting ? greeting + '...' : greeting;
 
   let dateStr = '';
@@ -281,22 +333,26 @@ function buildDashboard() {
       <div class="split-card">
         <div class="split-card-top">
           <span class="split-card-label">Today</span>
-          <span class="pct-badge pct-badge-${dayColour}">${Math.round(dayPct)}%</span>
         </div>
-        <div class="split-hours ${dayColour}">${todayHours.toFixed(2)}<span class="split-unit">h</span></div>
-        <div class="split-sub">of ${dailyTargetHours.toFixed(1)}h target</div>
+        <div class="split-hours">${todayHours.toFixed(2)}<span class="split-unit">h</span></div>
+        <div class="split-sub">today's contribution</div>
         ${paceLine}
         <div class="progress-bar" style="margin-top:auto">
-          <div class="progress-bar-fill ${dayColour}" style="width:${dayPct.toFixed(1)}%"></div>
+          <div class="progress-bar-fill ${weekColour}" style="width:${weekPct.toFixed(1)}%"></div>
         </div>
       </div>
       <div class="split-card" id="week-tile">
         <div class="split-card-top">
           <span class="split-card-label">Week</span>
-          <span class="pct-badge pct-badge-${weekColour}">${Math.round(weekPct)}%</span>
+          <div style="display:flex;align-items:center;gap:4px">
+            <span class="pct-badge pct-badge-${weekColour}">${Math.round(weekPct)}%</span>
+            ${canShowTrend && trendArrow ? `<span class="week-trend-badge week-trend-${trendCls}">${trendArrow} ${trendSign}${Math.abs(trendNetChange).toFixed(1)}h</span>` : ''}
+          </div>
         </div>
-        <div class="split-hours ${bonus ? 'green' : ''}">${earnedHours.toFixed(2)}<span class="split-unit">h</span></div>
-        <div class="split-sub">of ${targetHours.toFixed(1)}h target</div>
+        <div class="split-hours">${earnedHours.toFixed(2)}<span class="split-unit">h</span></div>
+        <div class="week-rostered-row">Rostered ${rosteredH.toFixed(1)}h <span class="week-rostered-sep">·</span> Target ${displayTargetH.toFixed(1)}h</div>
+        ${allowanceH >= 0.1 ? `<div class="week-allowance-label">Allows ${allowanceH.toFixed(1)}h travel &amp; PF</div>` : ''}
+        <div class="week-target-basis">${isRolling ? `Based on your last ${rollingN} weeks` : 'Est. · personalises after 4 weeks'}</div>
         <div class="week-chart">${weekBarsHTML}</div>
       </div>
     </div>
@@ -340,7 +396,7 @@ function buildDashboard() {
       </div>
     </details>
 
-    ${buildInsightsCard(dailyTargetHours, todayHours, targetHours, earnedHours, todayPFMins)}
+    ${buildInsightsCard(dailyTargetHours, todayHours, targetH, earnedHours, todayPFMins)}
     ${buildCreditGraph()}
   `;
 }
@@ -809,19 +865,11 @@ function buildTickerStrip() {
   const pct     = target > 0 ? (earned / target) * 100 : 0;
   const wkDays  = weekDays(todayWk);
 
-  // ── 1. Daily target status (most actionable) ──
-  const todayJobs   = (week.days || {})[todayKey] || [];
-  const todayH      = todayJobs.reduce((s, j) => s + j.creditMins, 0) / 60;
-  const dailyT      = getDailyTarget(state, week, todayKey);
-  if (dailyT > 0) {
-    if (todayH >= dailyT) {
-      const over = todayH - dailyT;
-      items.push(`Daily target hit ✓${over >= 0.05 ? ' · +' + over.toFixed(2) + 'h over' : ''}`);
-    } else {
-      const gap        = dailyT - todayH;
-      const jobsNeeded = Math.ceil(gap / (56 / 60));
-      items.push(`${jobsNeeded} more job${jobsNeeded === 1 ? '' : 's'} to hit daily target`);
-    }
+  // ── 1. Today's contribution to weekly target ──
+  const todayJobs = (week.days || {})[todayKey] || [];
+  const todayH    = todayJobs.reduce((s, j) => s + j.creditMins, 0) / 60;
+  if (todayH > 0) {
+    items.push(`Today +${todayH.toFixed(2)}h · ${Math.round(pct)}% of weekly target`);
   }
 
   // ── 2. Time since last logged job ──
@@ -839,7 +887,7 @@ function buildTickerStrip() {
   }
 
   // ── 3. WK number + weekly status ──
-  const bonusTxt = bonus ? 'Bonus ✓' : pct >= 80 ? 'On track' : 'Behind';
+  const bonusTxt = bonus ? 'Bonus ✓' : pct >= 90 ? 'On track' : pct >= 70 ? 'Amber' : 'Behind';
   items.push(`WK ${isoWkNum} · ${bonusTxt}`);
 
   // ── 4. Hours/jobs to weekly bonus ──
@@ -884,17 +932,13 @@ function buildTickerStrip() {
     items.push(`${hiveCount} Hive install${hiveCount === 1 ? '' : 's'} this week`);
   }
 
-  // ── 9. Daily target streak ──
-  let streak = 0;
-  for (const dk of wkDays.slice(0, 5)) {
-    if (dk > todayKey) break;
-    if (dayIsLeave(week, dk)) continue;
-    const dt = getDailyTarget(state, week, dk);
-    if (dt <= 0) continue;
-    const dh = ((week.days || {})[dk] || []).reduce((s, j) => s + j.creditMins, 0) / 60;
-    if (dh >= dt) { streak++; } else { streak = 0; }
-  }
-  if (streak >= 2) items.push(`${streak} days hitting daily target`);
+  // ── 9. Weekly target on-track days (how many days had any credits) ──
+  const daysWithCredits = wkDays.slice(0, 5).filter(dk => {
+    if (dk > todayKey) return false;
+    if (dayIsLeave(week, dk)) return false;
+    return ((week.days || {})[dk] || []).length > 0;
+  }).length;
+  if (daysWithCredits >= 3) items.push(`${daysWithCredits} productive days this week`);
 
   if (items.length === 0) return '';
 
@@ -1102,7 +1146,7 @@ function buildHistory() {
       const earned = weekCreditHours(week);
       const target = adjustedTargetHours(state, week);
       const pct    = target > 0 ? (earned / target) * 100 : (earned > 0 ? 100 : 0);
-      const colour = pct >= 100 ? 'green' : pct >= 80 ? 'amber' : earned === 0 ? 'grey' : 'red';
+      const colour = pct >= 90 ? 'green' : pct >= 70 ? 'amber' : earned === 0 ? 'grey' : 'red';
       return `
         <div class="trend-col" data-goto-week="${wk}" style="cursor:pointer">
           <div class="trend-track">
@@ -1127,7 +1171,7 @@ function buildHistory() {
     const target = adjustedTargetHours(state, week);
     const pct    = target > 0 ? (earned / target) * 100 : 0;
     const bonus  = bonusAchieved(state, week);
-    const colour = pct >= 100 ? 'green' : pct >= 80 ? 'amber' : earned === 0 ? 'grey' : 'red';
+    const colour = pct >= 90 ? 'green' : pct >= 70 ? 'amber' : earned === 0 ? 'grey' : 'red';
     const isCurrent = wk === currentWeekKey;
     const isPast    = wk < currentWk;
     const excluded  = week.excludeFromCtap || false;
@@ -1135,7 +1179,7 @@ function buildHistory() {
       <div class="history-item" data-goto-week="${wk}">
         <div class="hi-left">
           <div class="hi-week">${weekLabel(wk)}${isCurrent ? ' (current)' : ''}</div>
-          <div class="hi-credits">${earned.toFixed(2)}h / ${target.toFixed(2)}h target — ${bonus ? 'Bonus ✓' : pct >= 80 ? 'Close' : 'Below target'}</div>
+          <div class="hi-credits">${earned.toFixed(2)}h / ${target.toFixed(2)}h target — ${bonus ? 'Bonus ✓' : pct >= 90 ? 'On track' : pct >= 70 ? 'Amber zone' : 'Below target'}</div>
           ${week.note ? `<div class="hi-note">${week.note}</div>` : ''}
           ${isPast ? `<button class="ctap-toggle-btn${excluded ? ' excluded' : ''}" data-week-key="${wk}">${excluded ? '✕ Excluded from CTAP' : '✓ In CTAP'}</button>` : ''}
           ${isPast ? `<div class="hi-retro">
@@ -1186,12 +1230,20 @@ function buildSettings() {
         </div>
       </div>
       <div class="settings-group" style="margin-top:12px">
-        <label>Base weekly hours target</label>
+        <label>Base weekly hours (rostered hours)</label>
         <div class="settings-row">
           <input type="number" id="base-hours-input" value="${state.baseHours}" min="1" max="80" step="0.5">
           <button id="save-base-hours">Save</button>
         </div>
-        <p class="settings-note">Default: 40 hours. Adjust each quarter as needed. Deductions are subtracted from this to get your adjusted target.</p>
+        <p class="settings-note">Default: 40 hours. This is your contracted weekly hours. Leave days are automatically deducted from this each week.</p>
+      </div>
+      <div class="settings-group">
+        <label>Adjusted Weekly Target <span style="font-size:0.65rem;font-weight:400;text-transform:none;letter-spacing:0">(% of rostered hours)</span></label>
+        <div class="settings-row">
+          <input type="number" id="weekly-pct-input" value="${Math.round((typeof state.weeklyTargetPct === 'number' ? state.weeklyTargetPct : 0.8) * 100)}" min="50" max="100" step="1">
+          <button id="save-weekly-pct">Save</button>
+        </div>
+        <p class="settings-note">Default: 80%. Applied to your rostered hours to set the weekly target, leaving 20% as built-in allowance for travel and performance factor. Your target automatically personalises to your rolling average after 4 completed weeks.</p>
       </div>
       <div class="settings-group">
         <label>Starting CTAP balance (hours)</label>
@@ -1269,8 +1321,12 @@ function buildSettings() {
         Bonus: earned credit hours ≥ adjusted target hours<br>
         Adjusted target = base hours − deductions − leave hours<br>
         <br>
-        All data is stored locally on this device.
+        ${_ctapUser ? 'Data synced to your account.' : 'All data is stored locally on this device.'}
       </p>
+      ${_ctapUser ? `<div class="settings-group" style="margin-top:4px">
+        <p class="settings-note" style="margin-bottom:8px">Signed in as <b>${_ctapUser.email}</b></p>
+        <button id="sign-out-btn" style="padding:10px 20px;background:var(--surface2);color:var(--muted);border:none;border-radius:10px;font-size:0.85rem;font-weight:600;cursor:pointer;width:100%">Sign out</button>
+      </div>` : ''}
       <div class="about-watermark">
         <p class="about-watermark-name">Created &amp; designed by Jake Rainford</p>
         <p class="about-watermark-contact">Questions or suggestions? <a href="mailto:jake.rainford@britishgas.co.uk" class="about-watermark-link">jake.rainford@britishgas.co.uk</a></p>
@@ -1509,7 +1565,8 @@ function buildWeekForecastSheet() {
   const isFutureWeek = currentWeekKey > todayWk;
 
   const earnedHours = weekCreditHours(week);
-  const targetHours = adjustedTargetHours(state, week);
+  const _eff = isPastWeek ? null : effectiveTargetHours(state, week, currentWeekKey);
+  const targetHours = isPastWeek ? adjustedTargetHours(state, week) : _eff.hours;
   const wDays = weekDays(currentWeekKey);
 
   // Days with at least one job logged (past + today)
@@ -1546,7 +1603,7 @@ function buildWeekForecastSheet() {
   const neededPer  = daysRemaining > 0 ? Math.max(0, targetHours - earnedHours) / daysRemaining : 0;
 
   const pct       = targetHours > 0 ? Math.min((earnedHours / targetHours) * 100, 100) : 0;
-  const barColour = pct >= 100 ? 'green' : pct >= 80 ? 'amber' : 'red';
+  const barColour = pct >= 90 ? 'green' : pct >= 70 ? 'amber' : 'red';
   const isFinalTone = isPastWeek || (!isFutureWeek && daysRemaining === 0);
   const wkDays5   = wDays.slice(0, 5);
   const initDay   = (activeDayKey && wkDays5.includes(activeDayKey)) ? activeDayKey : wkDays5[0];
@@ -1703,7 +1760,7 @@ function buildWeekSummarySheet() {
   const bonus = bonusAchieved(state, week);
   const gap = earned - target;
   const pct = target > 0 ? Math.min((earned / target) * 100, 100) : 0;
-  const barColour = pct >= 100 ? 'green' : pct >= 80 ? 'amber' : 'red';
+  const barColour = pct >= 90 ? 'green' : pct >= 70 ? 'amber' : 'red';
 
   // Best single day
   const wkDays = weekDays(wk);
@@ -1925,8 +1982,13 @@ function attachListeners() {
   // Bottom nav
   document.querySelectorAll('[data-tab]').forEach(btn => {
     btn.addEventListener('click', () => {
+      const tab = btn.dataset.tab;
+      if (_isOffline && tab === 'log') {
+        showToast("You're offline — logging unavailable");
+        return;
+      }
       weekSummaryKey = null;
-      activeTab = btn.dataset.tab;
+      activeTab = tab;
       if (activeTab === 'dashboard') { currentWeekKey = getWeekKey(new Date()); ctapProjectedMode = false; }
       if (activeTab === 'log') { activeLogDay = getTodayKey(); jobSearch = ''; }
       render();
@@ -2053,6 +2115,7 @@ function attachListeners() {
       week.days[dayKey].splice(idx, 1);
       if (week.days[dayKey].length === 0) delete week.days[dayKey];
       saveState(state);
+      if (window.__ctapSyncWeek) window.__ctapSyncWeek(currentWeekKey);
       render();
     });
   });
@@ -2067,6 +2130,7 @@ function attachListeners() {
       if (week && week.mentorDays) {
         delete week.mentorDays[dayKey];
         saveState(state);
+        if (window.__ctapSyncWeek) window.__ctapSyncWeek(weekKey);
         render();
       }
     });
@@ -2082,6 +2146,7 @@ function attachListeners() {
       week.deductionLog.splice(idx, 1);
       week.deductionMins = week.deductionLog.reduce((s, d) => s + d.mins, 0);
       saveState(state);
+      if (window.__ctapSyncWeek) window.__ctapSyncWeek(currentWeekKey);
       render();
     });
   });
@@ -2179,8 +2244,24 @@ function attachListeners() {
   // Coach mode toggle
   const coachToggle = document.getElementById('coach-mode-toggle');
   if (coachToggle) coachToggle.addEventListener('change', () => {
-    localStorage.setItem('jcpd_coach_mode', coachToggle.checked ? 'true' : 'false');
+    const on = coachToggle.checked;
+    localStorage.setItem('jcpd_coach_mode', on ? 'true' : 'false');
+    if (window.__ctapSyncProfile) window.__ctapSyncProfile({ coach_mode: on });
     render();
+  });
+
+  // Sign out
+  const signOutBtn = document.getElementById('sign-out-btn');
+  if (signOutBtn) signOutBtn.addEventListener('click', async () => {
+    signOutBtn.textContent = 'Signing out…';
+    signOutBtn.disabled = true;
+    if (window.__ctapSignOut) {
+      await window.__ctapSignOut();
+    } else {
+      showToast('Sign out unavailable');
+      signOutBtn.textContent = 'Sign out';
+      signOutBtn.disabled = false;
+    }
   });
 
   // "Earlier this week" → History tab
@@ -2248,6 +2329,7 @@ function attachListeners() {
       const theme = btn.dataset.theme;
       document.body.classList.toggle('light', theme === 'light');
       localStorage.setItem('jcpd_theme', theme);
+      if (window.__ctapSyncProfile) window.__ctapSyncProfile({ theme });
       render();
     });
   });
@@ -2261,6 +2343,17 @@ function attachListeners() {
     saveState(state);
     render();
     showToast('Base hours updated');
+  });
+
+  // Save weekly target percentage
+  const saveWkPct = document.getElementById('save-weekly-pct');
+  if (saveWkPct) saveWkPct.addEventListener('click', () => {
+    const v = parseInt(document.getElementById('weekly-pct-input').value, 10);
+    if (isNaN(v) || v < 50 || v > 100) { showToast('Enter a value between 50 and 100'); return; }
+    state.weeklyTargetPct = v / 100;
+    saveState(state);
+    render();
+    showToast('Weekly target updated');
   });
 
   // History item click → navigate to that week; show summary for past weeks
@@ -2434,6 +2527,7 @@ function logJob(job, variableValue, optionalName) {
     if (!week.mentorDays) week.mentorDays = {};
     week.mentorDays[targetDay] = 'full';
     saveState(state);
+    if (window.__ctapSyncWeek) window.__ctapSyncWeek(targetWeekKey);
     showToast('Mentor Support logged — full day');
     if (activeTab !== 'log') render();
     return;
@@ -2445,6 +2539,7 @@ function logJob(job, variableValue, optionalName) {
     if (!week.mentorDays) week.mentorDays = {};
     week.mentorDays[targetDay] = 'partial';
     saveState(state);
+    if (window.__ctapSyncWeek) window.__ctapSyncWeek(targetWeekKey);
     showToast('Mentor Support logged — 20%');
     if (activeTab !== 'log') render();
     return;
@@ -2460,6 +2555,7 @@ function logJob(job, variableValue, optionalName) {
     week.deductionLog.push({ name: label, mins, date: targetDay });
     week.deductionMins = (week.deductionMins || 0) + mins;
     saveState(state);
+    if (window.__ctapSyncWeek) window.__ctapSyncWeek(targetWeekKey);
     showToast(label + ' — ' + mins + ' min');
     if (activeTab !== 'log') render();
     return;
@@ -2492,6 +2588,7 @@ function logJob(job, variableValue, optionalName) {
   const day = getOrCreateDay(week, targetDay);
   day.push(entry);
   saveState(state);
+  if (window.__ctapSyncWeek) window.__ctapSyncWeek(targetWeekKey);
 
   const displayName = job.name.replace(/\s*\(.*$/, '');
   const backfillNote = targetDay !== getTodayKey() ? ' (backdated)' : '';
@@ -2560,8 +2657,9 @@ function buildCoachCard() {
   const week = state.weeks[todayWk] || { days: {}, shifts: {} };
   const bal = cumulativeBalance(state);
   const earnedHours = weekCreditHours(week);
-  const targetHours = adjustedTargetHours(state, week);
-  const bonus = bonusAchieved(state, week);
+  const eff = effectiveTargetHours(state, week, todayWk);
+  const targetHours = eff.hours;
+  const bonus = earnedHours >= targetHours;
   const pastWks = Object.keys(state.weeks).filter(wk => wk < todayWk).sort();
   const msgs = [];
 
