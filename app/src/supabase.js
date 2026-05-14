@@ -1,4 +1,4 @@
-import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
+import { createClient } from '@supabase/supabase-js';
 
 // import.meta.env is replaced at Vite build time; fall back to inlined values
 // for static-file deployments (GitHub Pages). Anon key is a publishable client key.

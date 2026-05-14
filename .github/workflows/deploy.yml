@@ -24,13 +24,32 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build
+        run: npm run build
+        env:
+          VITE_SUPABASE_URL: https://ueupqkxdqjusfxtjaflq.supabase.co
+          VITE_SUPABASE_ANON_KEY: sb_publishable_yQZKuKK95O-2iGzNnfrQqg_cUlv2DZV
+
+      - name: Copy static assets to dist
+        run: |
+          cp app/app.js app/data.js app/sw.js app/manifest.json dist/
+          cp -r app/icons dist/
+
       - name: Setup Pages
         uses: actions/configure-pages@v5
 
-      - name: Upload app folder
+      - name: Upload dist folder
         uses: actions/upload-pages-artifact@v3
         with:
-          path: ./app
+          path: ./dist
 
       - name: Deploy to GitHub Pages
         id: deployment
