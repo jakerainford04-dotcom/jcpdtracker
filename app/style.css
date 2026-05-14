@@ -19,7 +19,7 @@ button, input, select, textarea { font-family: inherit; }
   --jcpd-accent-ink:   #ffffff;
   --jcpd-accent-dim:   rgba(74,134,216,.15);
   --jcpd-accent-glow:  rgba(74,134,216,.30);
-  --tile-border:       rgba(74,134,216,0.22);
+  --tile-border:       rgba(74,134,216,0.11);
 
   --jcpd-green: #5fd28a;
   --jcpd-amber: #ffc857;
@@ -77,7 +77,7 @@ body.light {
   --muted2:   #6c6c70;
   background: #f2f2f7;
   color: #000000;
-  --tile-border: rgba(74,134,216,0.38);
+  --tile-border: rgba(74,134,216,0.18);
 }
 body.light .top-bar {
   background: rgba(242,242,247,0.92);
