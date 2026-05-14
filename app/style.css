@@ -127,8 +127,8 @@ body {
   gap: 12px;
 }
 .top-title { flex-shrink: 0; display: flex; flex-direction: column; align-items: flex-start; }
-.top-title-main { font-size: 1.05rem; font-weight: 700; line-height: 1; letter-spacing: -0.3px; }
-.top-title-sub  { font-size: 0.62rem; color: var(--muted); letter-spacing: 0.03em; margin-top: 3px; }
+.top-title-main { font-size: 0.97rem; font-weight: 700; line-height: 1; letter-spacing: -0.3px; }
+.top-title-sub  { font-size: 0.59rem; color: var(--muted); letter-spacing: 0.03em; margin-top: 3px; }
 .top-greeting {
   font-size: 1rem;
   font-weight: 700;
@@ -765,7 +765,8 @@ body {
   font-size: 0.78rem;
   width: 62px;
   text-align: center;
-  font-family: 'JetBrains Mono', monospace;
+  font-family: var(--jcpd-font-sans);
+  font-variant-numeric: tabular-nums;
   -moz-appearance: textfield;
 }
 .retro-input::-webkit-inner-spin-button,
@@ -1596,7 +1597,8 @@ details[open] .info-chevron { transform: rotate(90deg); }
 .job-ts {
   font-size: 0.6rem;
   color: var(--muted2);
-  font-family: var(--jcpd-font-mono);
+  font-family: var(--jcpd-font-sans);
+  font-variant-numeric: tabular-nums;
   flex-shrink: 0;
   min-width: 28px;
   margin-right: 6px;
@@ -1772,7 +1774,8 @@ details[open] .info-chevron { transform: rotate(90deg); }
 .wsum-retro-val {
   font-size: 0.78rem;
   font-weight: 700;
-  font-family: 'JetBrains Mono', monospace;
+  font-family: var(--jcpd-font-sans);
+  font-variant-numeric: tabular-nums;
 }
 
 /* ── Day strip (week detail sheets) ── */
@@ -1811,7 +1814,8 @@ details[open] .info-chevron { transform: rotate(90deg); }
   font-size: 0.68rem;
   font-weight: 600;
   color: var(--text);
-  font-family: 'JetBrains Mono', monospace;
+  font-family: var(--jcpd-font-sans);
+  font-variant-numeric: tabular-nums;
 }
 .dsp-pill.dsp-active .dsp-hrs { color: #fff; }
 
@@ -1864,7 +1868,8 @@ details[open] .info-chevron { transform: rotate(90deg); }
   flex-shrink: 0;
   font-size: 0.67rem;
   font-weight: 700;
-  font-family: 'JetBrains Mono', monospace;
+  font-family: var(--jcpd-font-sans);
+  font-variant-numeric: tabular-nums;
   background: rgba(95,210,138,0.10);
   color: var(--green);
   border-radius: 6px;
@@ -1916,7 +1921,8 @@ details[open] .info-chevron { transform: rotate(90deg); }
 .ddp-total-val {
   font-size: 0.92rem;
   font-weight: 700;
-  font-family: 'JetBrains Mono', monospace;
+  font-family: var(--jcpd-font-sans);
+  font-variant-numeric: tabular-nums;
   color: var(--text);
 }
 .ddp-total-val.green { color: var(--green); }
@@ -1929,7 +1935,8 @@ details[open] .info-chevron { transform: rotate(90deg); }
 .ddp-ts {
   flex-shrink: 0;
   font-size: 0.62rem;
-  font-family: 'JetBrains Mono', monospace;
+  font-family: var(--jcpd-font-sans);
+  font-variant-numeric: tabular-nums;
   color: var(--muted2);
   min-width: 34px;
 }
@@ -1969,7 +1976,8 @@ details[open] .info-chevron { transform: rotate(90deg); }
   border-radius: 7px;
   color: var(--fg);
   font-size: 0.78rem;
-  font-family: 'JetBrains Mono', monospace;
+  font-family: var(--jcpd-font-sans);
+  font-variant-numeric: tabular-nums;
   padding: 4px 6px;
   text-align: center;
   color-scheme: dark;
@@ -2015,7 +2023,8 @@ details[open] .info-chevron { transform: rotate(90deg); }
   border-radius: 8px;
   color: var(--fg);
   font-size: 0.9rem;
-  font-family: 'JetBrains Mono', monospace;
+  font-family: var(--jcpd-font-sans);
+  font-variant-numeric: tabular-nums;
   padding: 7px 10px;
   color-scheme: dark;
   width: 120px;
@@ -2053,7 +2062,8 @@ details[open] .info-chevron { transform: rotate(90deg); }
   border-radius: 9px;
   color: var(--fg);
   font-size: 1.1rem;
-  font-family: 'JetBrains Mono', monospace;
+  font-family: var(--jcpd-font-sans);
+  font-variant-numeric: tabular-nums;
   padding: 10px;
   text-align: center;
   color-scheme: dark;
@@ -2228,7 +2238,8 @@ details[open] .info-chevron { transform: rotate(90deg); }
 .ctap-trend-val {
   font-size: 0.74rem;
   font-weight: 600;
-  font-family: 'JetBrains Mono', monospace;
+  font-family: var(--jcpd-font-sans);
+  font-variant-numeric: tabular-nums;
   color: var(--text);
 }
 .ctap-trend-val.green { color: var(--green); }
@@ -2324,7 +2335,8 @@ details[open] .info-chevron { transform: rotate(90deg); }
 .graph-target-lbl {
   fill: var(--muted2);
   font-size: 7px;
-  font-family: var(--jcpd-font-mono);
+  font-family: var(--jcpd-font-sans);
+  font-variant-numeric: tabular-nums;
 }
 .graph-line {
   fill: none;
