@@ -1,7 +1,8 @@
 import { supabase } from './supabase.js';
 
-export function showAuthScreen(onSuccess) {
-  let mode = 'login'; // 'login' | 'signup' | 'reset'
+export function showAuthScreen(onSuccess, options = {}) {
+  const dismissable = options.dismissable || false;
+  let mode = options.initialMode || 'login'; // 'login' | 'signup' | 'reset'
 
   const el = document.createElement('div');
   el.id = 'auth-overlay';
@@ -15,9 +16,14 @@ export function showAuthScreen(onSuccess) {
   }
 
   function buildAuthHTML(m) {
+    const closeBtn = dismissable
+      ? `<button class="auth-close-btn" id="auth-close" aria-label="Close">✕</button>`
+      : '';
+
     if (m === 'reset') {
       return `
         <div class="auth-card">
+          ${closeBtn}
           <div class="auth-logo">
             <span class="auth-logo-title">CTAP Tracker</span>
             <span class="auth-logo-sub">Service + Repair</span>
@@ -45,6 +51,7 @@ export function showAuthScreen(onSuccess) {
 
     return `
       <div class="auth-card">
+        ${closeBtn}
         <div class="auth-logo">
           <span class="auth-logo-title">CTAP Tracker</span>
           <span class="auth-logo-sub">Service + Repair</span>
@@ -85,6 +92,11 @@ export function showAuthScreen(onSuccess) {
   }
 
   function attachAuthListeners() {
+    const closeBtn = el.querySelector('#auth-close');
+    if (closeBtn) {
+      closeBtn.addEventListener('click', () => el.remove());
+    }
+
     el.querySelectorAll('.auth-tab').forEach(btn => {
       btn.addEventListener('click', () => {
         mode = btn.dataset.mode;
@@ -157,7 +169,6 @@ export function showAuthScreen(onSuccess) {
           if (!name) throw new Error('Please enter your name.');
           const { data, error } = await supabase.auth.signUp({ email, password });
           if (error) throw error;
-          // Supabase silently returns a user with no session for existing confirmed emails
           if (!data.session) {
             throw new Error('An account with this email already exists. Please log in instead.');
           }

@@ -2611,6 +2611,82 @@ details[open] .info-chevron { transform: rotate(90deg); }
   font-weight: 500;
 }
 
+/* ── Auth close button (dismissable overlay) ─────────────────────────── */
+.auth-close-btn {
+  position: absolute;
+  top: 14px;
+  right: 14px;
+  background: none;
+  border: none;
+  color: var(--muted);
+  font-size: 1.1rem;
+  cursor: pointer;
+  padding: 4px 8px;
+  border-radius: 6px;
+  line-height: 1;
+}
+.auth-close-btn:hover { color: var(--fg); }
+.auth-card { position: relative; }
+
+/* ── Settings account card ────────────────────────────────────────────── */
+.settings-account-card { padding: 18px 20px; }
+
+.settings-account-name {
+  font-size: 0.95rem;
+  font-weight: 600;
+  color: var(--fg);
+}
+.settings-account-email {
+  font-size: 0.8rem;
+  color: var(--muted);
+  margin-top: 2px;
+  margin-bottom: 14px;
+}
+.settings-signout-btn {
+  width: 100%;
+  padding: 10px;
+  background: var(--surface2);
+  color: var(--muted);
+  border: none;
+  border-radius: 10px;
+  font-size: 0.85rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.settings-sync-title {
+  font-size: 0.95rem;
+  font-weight: 600;
+  color: var(--fg);
+  margin-bottom: 4px;
+}
+.settings-sync-sub {
+  font-size: 0.8rem;
+  color: var(--muted);
+  margin: 0 0 16px;
+  line-height: 1.5;
+}
+.settings-sync-btns {
+  display: flex;
+  gap: 8px;
+}
+.settings-sync-btn {
+  flex: 1;
+  padding: 10px;
+  border-radius: 10px;
+  border: 1.5px solid var(--sep);
+  background: var(--surface2);
+  color: var(--fg);
+  font-size: 0.85rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+.settings-sync-btn-primary {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #fff;
+}
+
 /* ── Migration overlay ────────────────────────────────────────────────── */
 .migration-overlay {
   position: fixed;

@@ -1,10 +1,11 @@
 import { supabase } from './supabase.js';
-import { ensureProfile, loadStateFromSupabase, syncStateToSupabase, syncWeekJobLogs, syncWeekMeta, updateProfileField } from './db.js'; // updateProfileField used by window.__ctapSyncProfile
+import { ensureProfile, loadStateFromSupabase, syncStateToSupabase, syncWeekJobLogs, syncWeekMeta, updateProfileField } from './db.js';
 import { checkAndMigrate } from './migrate.js';
 import { showAuthScreen } from './auth.js';
 
 let _currentUser = null;
 let _syncTimer = null;
+let _saveStatePatched = false;
 const SYNC_DEBOUNCE = 2500;
 
 // ── Loading overlay ────────────────────────────────────────────────────────
@@ -38,12 +39,10 @@ function setupOfflineHandling() {
         banner.textContent = "You're offline — data will sync when you reconnect.";
         document.body.appendChild(banner);
       }
-      // Notify app to disable Log Job tab
       if (window.__ctapSetOffline) window.__ctapSetOffline(true);
     } else {
       if (banner) banner.remove();
       if (window.__ctapSetOffline) window.__ctapSetOffline(false);
-      // Flush pending sync
       if (_currentUser && window.__ctapGetState) {
         syncStateToSupabase(_currentUser, window.__ctapGetState()).catch(console.error);
       }
@@ -54,15 +53,15 @@ function setupOfflineHandling() {
   update();
 }
 
-// ── Debounced state sync ───────────────────────────────────────────────────
+// ── Debounced state sync (idempotent — safe to call in guest mode) ─────────
 
 function patchSaveState() {
+  if (_saveStatePatched) return;
+  _saveStatePatched = true;
   const origSave = window.saveState;
   window.saveState = function(s) {
-    // Always write to localStorage as a fast local cache
     origSave(s);
-    // Debounced sync to Supabase
-    if (!navigator.onLine || !_currentUser) return;
+    if (!navigator.onLine || !_currentUser) return; // guest: localStorage only
     clearTimeout(_syncTimer);
     _syncTimer = setTimeout(async () => {
       try {
@@ -74,7 +73,8 @@ function patchSaveState() {
   };
 }
 
-// Expose for immediate week-job sync (called after job log/delete)
+// ── Exposed bridge functions ───────────────────────────────────────────────
+
 window.__ctapSyncWeek = async function(weekKey) {
   if (!navigator.onLine || !_currentUser || !window.__ctapGetState) return;
   try {
@@ -86,13 +86,12 @@ window.__ctapSyncWeek = async function(weekKey) {
   }
 };
 
-// Expose sign-out for the Settings button
 window.__ctapSignOut = async function() {
   await supabase.auth.signOut();
   _currentUser = null;
+  if (window.__ctapOnSignOut) window.__ctapOnSignOut();
 };
 
-// Expose for profile field sync (theme, coach mode, etc.)
 window.__ctapSyncProfile = async function(fields) {
   if (!navigator.onLine || !_currentUser) return;
   try {
@@ -102,23 +101,37 @@ window.__ctapSyncProfile = async function(fields) {
   }
 };
 
-// ── Boot ───────────────────────────────────────────────────────────────────
+// Show auth overlay from Settings (dismissable, optional initial mode)
+window.__ctapShowAuth = function(initialMode) {
+  showAuthScreen(async (user, _unused, name) => {
+    _currentUser = user;
+    showLoading('Signing in…');
+    try {
+      const profile = await ensureProfile(user, name || '');
+      await checkAndMigrate(user, profile);
+      const { state } = await loadStateFromSupabase(user);
+      hideLoading();
+      window.__ctapInit(state, profile, user);
+    } catch (e) {
+      hideLoading();
+      console.error('Login failed:', e);
+      if (window.__ctapOnSignOut) window.__ctapOnSignOut(); // revert to guest view
+    }
+  }, { dismissable: true, initialMode: initialMode || 'login' });
+};
+
+// ── Boot paths ─────────────────────────────────────────────────────────────
 
 async function bootApp(user, displayName) {
   _currentUser = user;
   showLoading('Loading your data…');
-
   try {
     const profile = await ensureProfile(user, displayName || '');
     await checkAndMigrate(user, profile);
-
     const { state } = await loadStateFromSupabase(user);
-
     hideLoading();
     patchSaveState();
     setupOfflineHandling();
-
-    // Hand off to app.js
     window.__ctapInit(state, profile, user);
   } catch (e) {
     hideLoading();
@@ -130,32 +143,34 @@ async function bootApp(user, displayName) {
   }
 }
 
+function bootGuest() {
+  // State already loaded from localStorage by app.js at startup
+  const localState = window.__ctapGetState ? window.__ctapGetState() : null;
+  patchSaveState(); // safe — skips Supabase sync when _currentUser is null
+  setupOfflineHandling();
+  window.__ctapInit(localState, null, null);
+}
+
 // ── Session check + entry point ────────────────────────────────────────────
 
 async function init() {
   showLoading('Starting up…');
-
   try {
     const { data: { session }, error: sessErr } = await supabase.auth.getSession();
     if (sessErr) throw sessErr;
-
     hideLoading();
 
     if (session) {
       await bootApp(session.user);
     } else {
-      showAuthScreen(async (user, _unused, name) => {
-        await bootApp(user, name || '');
-      });
+      bootGuest();
     }
 
-    // Listen for auth state changes (sign out, session expiry)
+    // Handle sign-out and session expiry — go to guest mode, not auth screen
     supabase.auth.onAuthStateChange((event, session) => {
       if (event === 'SIGNED_OUT' || (!session && event !== 'INITIAL_SESSION')) {
         _currentUser = null;
-        showAuthScreen(async (user, _unused, name) => {
-          await bootApp(user, name || '');
-        });
+        if (window.__ctapOnSignOut) window.__ctapOnSignOut();
       }
     });
   } catch (e) {

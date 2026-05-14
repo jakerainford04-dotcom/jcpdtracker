@@ -27,17 +27,26 @@ window.addEventListener('error', function(e) {
 window.__ctapInit = function(loadedState, profile, user) {
   _ctapUser = user;
   _ctapDisplayName = profile ? (profile.display_name || '') : '';
-  state = loadedState;
-  // Apply persisted theme/coach from profile
+  if (loadedState != null) state = loadedState;
+  // Apply theme/coach from profile (logged in) or localStorage (guest)
+  const isLight = profile
+    ? profile.theme === 'light'
+    : localStorage.getItem('jcpd_theme') === 'light';
+  document.body.classList.toggle('light', isLight);
   if (profile) {
-    const isLight = profile.theme === 'light';
-    document.body.classList.toggle('light', isLight);
     localStorage.setItem('jcpd_theme', profile.theme || 'dark');
     localStorage.setItem('jcpd_coach_mode', profile.coach_mode ? 'true' : 'false');
   }
   if ('serviceWorker' in navigator) {
     navigator.serviceWorker.register('sw.js').catch(function() {});
   }
+  render();
+};
+
+// Called after sign-out — stay in app as guest, re-render Settings
+window.__ctapOnSignOut = function() {
+  _ctapUser = null;
+  _ctapDisplayName = '';
   render();
 };
 
@@ -1323,15 +1332,25 @@ function buildSettings() {
         <br>
         ${_ctapUser ? 'Data synced to your account.' : 'All data is stored locally on this device.'}
       </p>
-      ${_ctapUser ? `<div class="settings-group" style="margin-top:4px">
-        <p class="settings-note" style="margin-bottom:8px">Signed in as <b>${_ctapUser.email}</b></p>
-        <button id="sign-out-btn" style="padding:10px 20px;background:var(--surface2);color:var(--muted);border:none;border-radius:10px;font-size:0.85rem;font-weight:600;cursor:pointer;width:100%">Sign out</button>
-      </div>` : ''}
       <div class="about-watermark">
         <p class="about-watermark-name">Created &amp; designed by Jake Rainford</p>
         <p class="about-watermark-contact">Questions or suggestions? <a href="mailto:jake.rainford@britishgas.co.uk" class="about-watermark-link">jake.rainford@britishgas.co.uk</a></p>
       </div>
     </div>
+    ${_ctapUser ? `
+    <div class="dashboard-card settings-account-card">
+      <div class="settings-account-name">${_ctapDisplayName || _ctapUser.email}</div>
+      <div class="settings-account-email">${_ctapUser.email}</div>
+      <button id="sign-out-btn" class="settings-signout-btn">Sign out</button>
+    </div>` : `
+    <div class="dashboard-card settings-account-card">
+      <div class="settings-sync-title">Sync across devices</div>
+      <p class="settings-sync-sub">Sign in to save your data to the cloud and access it on any device.</p>
+      <div class="settings-sync-btns">
+        <button id="settings-login-btn" class="settings-sync-btn settings-sync-btn-primary">Log In</button>
+        <button id="settings-signup-btn" class="settings-sync-btn">Create Account</button>
+      </div>
+    </div>`}
   `;
 }
 
@@ -2250,7 +2269,7 @@ function attachListeners() {
     render();
   });
 
-  // Sign out
+  // Sign out (logged-in view)
   const signOutBtn = document.getElementById('sign-out-btn');
   if (signOutBtn) signOutBtn.addEventListener('click', async () => {
     signOutBtn.textContent = 'Signing out…';
@@ -2262,6 +2281,16 @@ function attachListeners() {
       signOutBtn.textContent = 'Sign out';
       signOutBtn.disabled = false;
     }
+  });
+
+  // Log in / Create Account (guest view)
+  const loginBtn = document.getElementById('settings-login-btn');
+  if (loginBtn) loginBtn.addEventListener('click', () => {
+    if (window.__ctapShowAuth) window.__ctapShowAuth('login');
+  });
+  const signupBtn = document.getElementById('settings-signup-btn');
+  if (signupBtn) signupBtn.addEventListener('click', () => {
+    if (window.__ctapShowAuth) window.__ctapShowAuth('signup');
   });
 
   // "Earlier this week" → History tab
