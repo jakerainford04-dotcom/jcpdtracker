@@ -1,7 +1,7 @@
 import { defineConfig } from 'vite';
 
 export default defineConfig(({ command }) => ({
-  base: command === 'build' ? '/ctap-tracker/' : '/',
+  base: command === 'build' ? '/CTAPTracker/' : '/',
   root: './app',
   envDir: '..', // .env lives at /JCPD/, one level above the app root
   cacheDir: './app/.vite', // Inside the app root → served as /.vite/deps/… (no /@fs/ prefix)
