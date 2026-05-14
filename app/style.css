@@ -130,7 +130,7 @@ body {
 .top-title-main { font-size: 1.5rem; font-weight: 700; line-height: 1; letter-spacing: -0.5px; }
 .top-title-sub  { font-size: 0.72rem; color: var(--muted); letter-spacing: 0.02em; margin-top: 4px; }
 .top-greeting {
-  font-size: 1rem;
+  font-size: 0.9rem;
   font-weight: 700;
   line-height: 1.1;
   letter-spacing: -0.3px;
