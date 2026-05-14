@@ -105,6 +105,7 @@ function buildTopBar() {
         <button id="prev-week" aria-label="Previous week">&#8249;</button>
         <span>${weekLabel(currentWeekKey)}${isCurrentWeek ? '<span class="week-dot">•</span>' : ''}${isFutureWeek ? '<span class="week-future-badge">FUTURE</span>' : ''}</span>
         <button id="next-week" aria-label="Next week" ${isCurrentWeek ? 'disabled style="opacity:0.3"' : ''}>&#8250;</button>
+        ${isCurrentWeek ? `<button id="ctap-proj-toggle" class="ctap-proj-btn${ctapProjectedMode ? ' active' : ''}">${ctapProjectedMode ? 'Proj' : 'Actual'}</button>` : ''}
       </div>` : ''}
     </header>
   `;
@@ -314,7 +315,7 @@ function buildDashboard() {
 
     <div class="ctap-hero-card">
       <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
-        <div class="ctap-hero-label">CTAP Balance${isCurrentWeek && ctapProjectedMode ? ' <span class="ctap-proj-badge">PROJECTED</span>' : ''}</div>
+        <div class="ctap-hero-label">CTAP Balance</div>
         <span class="status-badge ${balColour}" style="font-size:0.58rem;padding:2px 8px">${displayBal >= 0 ? 'In credit' : 'Deficit'}</span>
       </div>
       <div class="ctap-number-row">
@@ -323,9 +324,8 @@ function buildDashboard() {
         </span>
         <span class="ctap-unit">HRS</span>
       </div>
-      <div style="display:flex;justify-content:space-between;align-items:center;margin-top:8px">
+      <div style="margin-top:8px">
         <span style="font-size:0.62rem;color:var(--muted)">Starting balance: <span style="font-weight:600;color:var(--muted)">${(state.startingBalance || 0) >= 0 ? '+' : ''}${(state.startingBalance || 0).toFixed(2)}h</span></span>
-        ${isCurrentWeek ? `<button id="ctap-proj-toggle" class="ctap-proj-btn${ctapProjectedMode ? ' active' : ''}">${ctapProjectedMode ? 'Projected' : 'Actual'}</button>` : ''}
       </div>
     </div>
 
