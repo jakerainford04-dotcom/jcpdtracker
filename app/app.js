@@ -14,6 +14,9 @@ let jobSearch = '';
 let ctapProjectedMode = false;
 let expandedZeroWeek = null;
 let weekendExpanded = false;
+let openSettingsInfo = null;
+let creditsInfoExpanded = false;
+let howToExpanded = false;
 let graphWeekKey = getWeekKey(new Date());
 let _ctapUser = null;          // populated by __ctapInit
 let _ctapDisplayName = '';     // populated by __ctapInit
@@ -1288,136 +1291,124 @@ function buildHistory() {
 }
 
 // ── Settings ───────────────────────────────────────────────────────────────
+const SVG_SUN  = `<svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><circle cx="8" cy="8" r="2.5"/><line x1="8" y1="1" x2="8" y2="3"/><line x1="8" y1="13" x2="8" y2="15"/><line x1="1" y1="8" x2="3" y2="8"/><line x1="13" y1="8" x2="15" y2="8"/><line x1="3.5" y1="3.5" x2="4.6" y2="4.6"/><line x1="11.4" y1="11.4" x2="12.5" y2="12.5"/><line x1="12.5" y1="3.5" x2="11.4" y2="4.6"/><line x1="4.6" y1="11.4" x2="3.5" y2="12.5"/></svg>`;
+const SVG_MOON = `<svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M13.5 10.5A6 6 0 0 1 5.5 2.5a6 6 0 1 0 8 8z"/></svg>`;
+
 function buildSettings() {
   const isLight = document.body.classList.contains('light');
   const coachOn = isCoachModeOn();
+  const baseHours = state.baseHours || 40;
+  const wkPct = Math.round((typeof state.weeklyTargetPct === 'number' ? state.weeklyTargetPct : 0.8) * 100);
+  const startBal = state.startingBalance || 0;
+  const balDisp = (startBal > 0 ? '+' : '') + startBal.toFixed(1);
+
+  const sectionLabel = t => `<div class="st-section-label">${t}</div>`;
+  const rowDiv = () => `<div class="st-row-divider"></div>`;
+  const stepper = (id, val, unit = '') =>
+    `<div class="st-stepper"><button class="st-step-btn" id="${id}-dec">−</button><span class="st-step-val">${val}${unit}</span><button class="st-step-btn" id="${id}-inc">+</button></div>`;
+  const infoBtn = key =>
+    `<button class="st-info-btn${openSettingsInfo === key ? ' active' : ''}" data-info="${key}">i</button>`;
+  const infoPopover = text => `<div class="st-info-popover">${text}</div>`;
+
   return `
-    <div class="dashboard-card">
-      <h2>Settings</h2>
-      <div class="settings-group" style="margin-top:12px">
-        <div class="coach-toggle-row">
-          <div style="flex:1;min-width:0">
-            <label>Coach Mode <span class="beta-badge">BETA</span></label>
-            <p class="settings-note" style="margin-top:3px">Surfaces personalised tips and targets to help you perform at your best</p>
-          </div>
-          <label class="coach-slider-wrap">
-            <input type="checkbox" id="coach-mode-toggle"${coachOn ? ' checked' : ''}>
-            <span class="coach-slider"></span>
-          </label>
+    ${sectionLabel('APPEARANCE')}
+    <div class="st-card">
+      <div class="st-row">
+        <span class="st-row-label">Theme</span>
+        <div class="st-seg">
+          <button class="st-seg-btn theme-btn${!isLight ? ' active' : ''}" data-theme="dark">${SVG_MOON} Dark</button>
+          <button class="st-seg-btn theme-btn${isLight ? ' active' : ''}" data-theme="light">${SVG_SUN} Light</button>
         </div>
       </div>
-      <div class="settings-group" style="margin-top:12px">
-        <label>Appearance</label>
-        <div style="display:flex;gap:8px;margin-top:8px">
-          <button class="theme-btn${!isLight ? ' active' : ''}" data-theme="dark"
-            style="flex:1;padding:10px;border-radius:10px;border:1.5px solid ${!isLight ? 'var(--accent)' : 'var(--sep)'};background:${!isLight ? 'var(--jcpd-accent-dim)' : 'var(--surface2)'};color:${!isLight ? 'var(--accent)' : 'var(--muted)'};font-weight:600;font-size:0.82rem;cursor:pointer">
-            🌙 Dark
-          </button>
-          <button class="theme-btn${isLight ? ' active' : ''}" data-theme="light"
-            style="flex:1;padding:10px;border-radius:10px;border:1.5px solid ${isLight ? 'var(--accent)' : 'var(--sep)'};background:${isLight ? 'var(--jcpd-accent-dim)' : 'var(--surface2)'};color:${isLight ? 'var(--accent)' : 'var(--muted)'};font-weight:600;font-size:0.82rem;cursor:pointer">
-            ☀️ Light
-          </button>
+      ${rowDiv()}
+      <div class="st-row">
+        <div style="flex:1;min-width:0">
+          <span class="st-row-label">Coach Mode <span class="beta-badge">BETA</span></span>
+          <div class="st-row-sub">Personalised tips and targets</div>
         </div>
-      </div>
-      <div class="settings-group" style="margin-top:12px">
-        <label>Base weekly hours (rostered hours)</label>
-        <div class="settings-row">
-          <input type="number" id="base-hours-input" value="${state.baseHours}" min="1" max="80" step="0.5">
-          <button id="save-base-hours">Save</button>
-        </div>
-        <p class="settings-note">Default: 40 hours. This is your contracted weekly hours. Leave days are automatically deducted from this each week.</p>
-      </div>
-      <div class="settings-group">
-        <label>Adjusted Weekly Target <span style="font-size:0.65rem;font-weight:400;text-transform:none;letter-spacing:0">(% of rostered hours)</span></label>
-        <div class="settings-row">
-          <input type="number" id="weekly-pct-input" value="${Math.round((typeof state.weeklyTargetPct === 'number' ? state.weeklyTargetPct : 0.8) * 100)}" min="50" max="100" step="1">
-          <button id="save-weekly-pct">Save</button>
-        </div>
-        <p class="settings-note">Default: 80%. Applied to your rostered hours to set the weekly target, leaving 20% as built-in allowance for travel and performance factor. Your target automatically personalises to your rolling average after 4 completed weeks.</p>
-      </div>
-      <div class="settings-group">
-        <label>Starting CTAP balance (hours)</label>
-        <div class="settings-row">
-          <input type="number" id="start-bal-input" value="${state.startingBalance || 0}" step="0.5">
-          <button id="save-start-bal">Save</button>
-        </div>
-        <p class="settings-note">Enter your accumulated balance in hours. Use a negative number if you're in deficit (e.g. -22). This is added to your weekly performance history to give your overall CTAP balance.</p>
+        <label class="coach-slider-wrap">
+          <input type="checkbox" id="coach-mode-toggle"${coachOn ? ' checked' : ''}>
+          <span class="coach-slider"></span>
+        </label>
       </div>
     </div>
-    <div class="dashboard-card" style="padding:0;overflow:hidden">
-      <details class="info-section">
-        <summary class="info-summary">
-          <span>How to use this app</span>
-          <span class="info-chevron">›</span>
-        </summary>
-        <div class="info-body">
-          <ol class="info-steps">
-            <li>
-              <div>
-                <span class="info-step-title">Set up your schedule</span>
-                Go to the <b>Schedule</b> tab and enter your shift start and end times for each day. Select your lunch break from the dropdown. Tap <b>Standard week</b> to quickly apply Mon–Fri 08:00–16:30 with 30 min lunch. Tap <b>Save Schedule</b> when done.
-              </div>
-            </li>
-            <li>
-              <div>
-                <span class="info-step-title">Log your jobs</span>
-                Tap <b>Log Job</b> and choose a category. <b>Core</b> covers standard visit types such as breakdowns, annual service visits, OCA, and installs. <b>Hive</b> covers all Hive install, repair, and recall job codes. <b>Sales</b> covers boiler leads. Tap a tile to log it instantly. Tiles with a dashed border are variable — they ask for extra input (minutes or hours) before logging.
-              </div>
-            </li>
-            <li>
-              <div>
-                <span class="info-step-title">Log absences and non-visit time</span>
-                Tap <b>Log Job</b> and select the <b>Absence</b> tab. Tap <b>EV Charging</b> (30 min credit), <b>Bybox Part Collection</b> (10 min), or <b>Merchant Parts Collection</b> (10 min) to log these instantly. Tap <b>Non-Productive Time</b> to enter a duration in minutes and an optional reason — this saves as a deduction against your daily target.
-              </div>
-            </li>
-            <li>
-              <div>
-                <span class="info-step-title">Track your day on the Dashboard</span>
-                The Dashboard shows your CTAP balance, today's credit hours vs target, weekly progress with a day-by-day bar chart, and a full list of jobs logged today. Tap <b>×</b> next to any job to remove it. The <b>Insights</b> section gives tips on pace, Hive pipeline, CTAP recovery, and today's estimated Performance Factor.
-              </div>
-            </li>
-            <li>
-              <div>
-                <span class="info-step-title">Mark annual leave</span>
-                On the <b>Schedule</b> tab, tap <b>Leave</b> next to any day. That day's hours are automatically removed from your weekly target so it does not count against you.
-              </div>
-            </li>
-            <li>
-              <div>
-                <span class="info-step-title">Understand your CTAP balance</span>
-                CTAP is your running credit or deficit across completed weeks. It starts from the <b>Starting balance</b> you enter in Settings, then each completed week's surplus or shortfall is added. The balance number turns green when you are in credit and stays white when in deficit — the badge in the top-right of the tile shows <b>In credit</b> or <b>Deficit</b> at a glance.
-              </div>
-            </li>
-            <li>
-              <div>
-                <span class="info-step-title">Use the History tab</span>
-                View all past weeks with a colour-coded dot. Tap any week to jump to it on the Dashboard. Each past week shows a <b>✓ In CTAP</b> button — tap it to exclude a week (such as a training week) from your balance calculation.
-              </div>
-            </li>
-            <li>
-              <div>
-                <span class="info-step-title">Settings</span>
-                Set your <b>base weekly hours target</b> (usually 40h — check your contract). Set your <b>starting CTAP balance</b> to reflect any balance you carry from before using this app. Use a negative number if you are in deficit, e.g. <b>-22</b>.
-              </div>
-            </li>
-          </ol>
+
+    ${sectionLabel('TARGETS')}
+    <div class="st-card">
+      <div class="st-row">
+        <span class="st-row-label">Weekly hours target</span>
+        <div class="st-row-controls">
+          ${stepper('base-hours', baseHours, 'h')}
+          ${infoBtn('hours')}
         </div>
-      </details>
+      </div>
+      ${openSettingsInfo === 'hours' ? infoPopover('Default 40h. Adjust each quarter as needed. Deductions are subtracted from this to get your adjusted target.') : ''}
+      ${rowDiv()}
+      <div class="st-row">
+        <span class="st-row-label">Target %</span>
+        <div class="st-row-controls">
+          ${stepper('wk-pct', wkPct, '%')}
+          ${infoBtn('pct')}
+        </div>
+      </div>
+      ${openSettingsInfo === 'pct' ? infoPopover('Default 80%. Applied to rostered hours to set the weekly credit target. Personalises to your rolling average after 4 completed weeks.') : ''}
+      ${rowDiv()}
+      <div class="st-row">
+        <span class="st-row-label">Starting CTAP balance</span>
+        <div class="st-row-controls">
+          ${stepper('start-bal', balDisp, 'h')}
+          ${infoBtn('balance')}
+        </div>
+      </div>
+      ${openSettingsInfo === 'balance' ? infoPopover('Your accumulated balance carried in. Use a negative number if in deficit (e.g. −22). Added to your weekly performance history to give your overall CTAP balance.') : ''}
     </div>
-    <div class="dashboard-card">
-      <h2>About</h2>
-      <p style="font-size:0.8rem;color:var(--muted);margin-top:8px;line-height:1.6">
-        Credits formula: minutes ÷ 83.58<br>
-        Bonus: earned credit hours ≥ adjusted target hours<br>
-        Adjusted target = base hours − deductions − leave hours<br>
-        <br>
-        ${_ctapUser ? 'Data synced to your account.' : 'All data is stored locally on this device.'}
-      </p>
-      <div class="about-watermark">
-        <p class="about-watermark-name">Created &amp; designed by Jake Rainford</p>
-        <p class="about-watermark-contact">Questions or suggestions? <a href="mailto:jake.rainford@britishgas.co.uk" class="about-watermark-link">jake.rainford@britishgas.co.uk</a></p>
+
+    ${sectionLabel('HELP')}
+    <div class="st-card">
+      <button class="st-nav-row" id="toggle-how-to">
+        <span class="st-row-label">How to use this app</span>
+        <span class="st-chevron${howToExpanded ? ' open' : ''}">›</span>
+      </button>
+      ${howToExpanded ? `<div class="st-how-to-body">
+        <ol class="info-steps">
+          <li><div><span class="info-step-title">Set up your schedule</span>Go to the <b>Schedule</b> tab and enter shift start/end times. Tap <b>Standard week</b> to apply Mon–Fri 08:00–16:30 with default lunch. Shifts save automatically.</div></li>
+          <li><div><span class="info-step-title">Log your jobs</span>Tap <b>Log Job</b> and choose a category. Core, Hive, Sales, and Absence are all covered. Tap a tile to log instantly — dashed tiles are variable and ask for extra input.</div></li>
+          <li><div><span class="info-step-title">Track on the Dashboard</span>See your CTAP balance, today's credit hours, weekly progress, and a day-by-day chart. Tap <b>×</b> to remove a job. Insights surfaces tips on pace, Hive pipeline, and CTAP recovery.</div></li>
+          <li><div><span class="info-step-title">Mark annual leave</span>On the Schedule tab, tap <b>Leave</b> next to any day. That day's hours are removed from your weekly target.</div></li>
+          <li><div><span class="info-step-title">Understand your CTAP balance</span>CTAP is your running credit or deficit. It starts from your starting balance, then each completed week's surplus or shortfall is added. Green = in credit.</div></li>
+          <li><div><span class="info-step-title">History tab</span>View all past weeks with a colour-coded dot. Tap any week to jump to it. Tap <b>✓ In CTAP</b> to exclude a week from your balance calculation.</div></li>
+        </ol>
+      </div>` : ''}
+    </div>
+
+    ${sectionLabel('ABOUT')}
+    <div class="st-card">
+      <div class="st-row">
+        <span class="st-row-label">Credits formula</span>
+        <span class="st-row-value">minutes ÷ 83.58</span>
+      </div>
+      ${rowDiv()}
+      <div class="st-row">
+        <span class="st-row-label">Version</span>
+        <span class="st-row-value">v0.4.0 · ${_ctapUser ? 'synced' : 'local'}</span>
+      </div>
+      ${rowDiv()}
+      <button class="st-nav-row" id="toggle-credits-info">
+        <span class="st-row-label">How credits work</span>
+        <span class="st-chevron${creditsInfoExpanded ? ' open' : ''}">›</span>
+      </button>
+      ${creditsInfoExpanded ? `<div class="st-credits-body">
+        <div class="st-kv"><span class="st-k">Bonus</span><span class="st-v">Earned credit hours ≥ adjusted target hours</span></div>
+        <div class="st-kv"><span class="st-k">Adjusted target</span><span class="st-v">Base hours − deductions − leave hours</span></div>
+        <div class="st-kv"><span class="st-k">Storage</span><span class="st-v">${_ctapUser ? 'Synced to your account.' : 'All data is on this device.'}</span></div>
+      </div>` : ''}
+      ${rowDiv()}
+      <div class="st-row">
+        <span class="st-row-label">Made by</span>
+        <a href="mailto:jake.rainford@britishgas.co.uk" class="st-row-link">Jake Rainford</a>
       </div>
     </div>
+
     ${_ctapUser ? `
     <div class="dashboard-card settings-account-card">
       <div class="settings-account-name">${_ctapDisplayName || _ctapUser.email}</div>
@@ -1432,8 +1423,11 @@ function buildSettings() {
         <button id="settings-signup-btn" class="settings-sync-btn">Create Account</button>
       </div>
     </div>`}
+
+    <div class="st-footer">Questions? <a href="mailto:jake.rainford@britishgas.co.uk" class="st-footer-link">jake.rainford@britishgas.co.uk</a></div>
   `;
 }
+
 
 // ── Modal ──────────────────────────────────────────────────────────────────
 function buildModal() {
@@ -2361,16 +2355,6 @@ function attachListeners() {
     render();
   });
 
-  // Save starting balance
-  const saveStartBal = document.getElementById('save-start-bal');
-  if (saveStartBal) saveStartBal.addEventListener('click', function() {
-    var v = parseFloat(document.getElementById('start-bal-input').value);
-    if (isNaN(v)) return;
-    state.startingBalance = v;
-    saveState(state);
-    render();
-    showToast('Starting balance saved');
-  });
 
   // Coach mode toggle
   const coachToggle = document.getElementById('coach-mode-toggle');
@@ -2464,38 +2448,59 @@ function attachListeners() {
     if (card) card.remove();
   });
 
-  // Theme toggle
+  // Theme toggle (segmented control)
   document.querySelectorAll('.theme-btn').forEach(btn => {
     btn.addEventListener('click', () => {
       const theme = btn.dataset.theme;
       document.body.classList.toggle('light', theme === 'light');
       localStorage.setItem('jcpd_theme', theme);
       if (window.__ctapSyncProfile) window.__ctapSyncProfile({ theme });
+      showToast('✓ Saved');
       render();
     });
   });
 
-  // Save base hours
-  const saveBH = document.getElementById('save-base-hours');
-  if (saveBH) saveBH.addEventListener('click', () => {
-    const v = parseFloat(document.getElementById('base-hours-input').value);
-    if (isNaN(v) || v <= 0) return;
-    state.baseHours = v;
-    saveState(state);
-    render();
-    showToast('Base hours updated');
-  });
+  // Settings steppers
+  function bindStepper(decId, incId, get, set, min, max, step) {
+    const dec = document.getElementById(decId);
+    const inc = document.getElementById(incId);
+    if (dec) dec.addEventListener('click', () => { set(Math.max(min, get() - step)); saveState(state); showToast('✓ Saved'); render(); });
+    if (inc) inc.addEventListener('click', () => { set(Math.min(max, get() + step)); saveState(state); showToast('✓ Saved'); render(); });
+  }
+  bindStepper('base-hours-dec', 'base-hours-inc',
+    () => state.baseHours || 40,
+    v => { state.baseHours = v; },
+    1, 80, 1);
+  bindStepper('wk-pct-dec', 'wk-pct-inc',
+    () => Math.round((typeof state.weeklyTargetPct === 'number' ? state.weeklyTargetPct : 0.8) * 100),
+    v => { state.weeklyTargetPct = v / 100; },
+    50, 100, 5);
+  bindStepper('start-bal-dec', 'start-bal-inc',
+    () => state.startingBalance || 0,
+    v => { state.startingBalance = v; },
+    -999, 999, 1);
 
-  // Save weekly target percentage
-  const saveWkPct = document.getElementById('save-weekly-pct');
-  if (saveWkPct) saveWkPct.addEventListener('click', () => {
-    const v = parseInt(document.getElementById('weekly-pct-input').value, 10);
-    if (isNaN(v) || v < 50 || v > 100) { showToast('Enter a value between 50 and 100'); return; }
-    state.weeklyTargetPct = v / 100;
-    saveState(state);
-    render();
-    showToast('Weekly target updated');
+  // Settings info popovers
+  document.querySelectorAll('.st-info-btn').forEach(btn => {
+    btn.addEventListener('click', e => {
+      e.stopPropagation();
+      const key = btn.dataset.info;
+      openSettingsInfo = openSettingsInfo === key ? null : key;
+      render();
+    });
   });
+  // Dismiss info popover on outside tap
+  document.addEventListener('click', () => {
+    if (openSettingsInfo) { openSettingsInfo = null; render(); }
+  }, { once: true });
+
+  // How to use — expand/collapse
+  const howToBtn = document.getElementById('toggle-how-to');
+  if (howToBtn) howToBtn.addEventListener('click', () => { howToExpanded = !howToExpanded; render(); });
+
+  // How credits work — expand/collapse
+  const creditsBtn = document.getElementById('toggle-credits-info');
+  if (creditsBtn) creditsBtn.addEventListener('click', () => { creditsInfoExpanded = !creditsInfoExpanded; render(); });
 
   // History item click → navigate to that week; show summary for past weeks
   document.querySelectorAll('[data-goto-week]').forEach(el => {
