@@ -1281,12 +1281,11 @@ function buildSettings() {
   const baseHours = state.baseHours || 40;
   const wkPct = Math.round((typeof state.weeklyTargetPct === 'number' ? state.weeklyTargetPct : 0.8) * 100);
   const startBal = state.startingBalance || 0;
-  const balDisp = (startBal > 0 ? '+' : '') + startBal.toFixed(1);
 
   const sectionLabel = t => `<div class="st-section-label">${t}</div>`;
   const rowDiv = () => `<div class="st-row-divider"></div>`;
-  const stepper = (id, val, unit = '') =>
-    `<div class="st-stepper"><button class="st-step-btn" id="${id}-dec">−</button><span class="st-step-val">${val}${unit}</span><button class="st-step-btn" id="${id}-inc">+</button></div>`;
+  const numInput = (id, val, unit = '', extra = '') =>
+    `<div class="st-num-wrap"><input type="number" id="${id}" class="st-num-input" value="${val}" ${extra}><span class="st-num-unit">${unit}</span></div>`;
   const infoBtn = key =>
     `<button class="st-info-btn${openSettingsInfo === key ? ' active' : ''}" data-info="${key}">i</button>`;
   const infoPopover = text => `<div class="st-info-popover">${text}</div>`;
@@ -1319,7 +1318,7 @@ function buildSettings() {
       <div class="st-row">
         <span class="st-row-label">Weekly hours target</span>
         <div class="st-row-controls">
-          ${stepper('base-hours', baseHours, 'h')}
+          ${numInput('base-hours-input', baseHours, 'h', 'min="1" max="80" inputmode="numeric"')}
           ${infoBtn('hours')}
         </div>
       </div>
@@ -1328,7 +1327,7 @@ function buildSettings() {
       <div class="st-row">
         <span class="st-row-label">Target %</span>
         <div class="st-row-controls">
-          ${stepper('wk-pct', wkPct, '%')}
+          ${numInput('wk-pct-input', wkPct, '%', 'min="50" max="100" inputmode="numeric"')}
           ${infoBtn('pct')}
         </div>
       </div>
@@ -1337,7 +1336,7 @@ function buildSettings() {
       <div class="st-row">
         <span class="st-row-label">Starting CTAP balance</span>
         <div class="st-row-controls">
-          ${stepper('start-bal', balDisp, 'h')}
+          ${numInput('start-bal-input', startBal.toFixed(1), 'h', 'min="-999" max="999" step="0.5" inputmode="decimal"')}
           ${infoBtn('balance')}
         </div>
       </div>
@@ -1365,11 +1364,6 @@ function buildSettings() {
     ${sectionLabel('ABOUT')}
     <div class="st-card">
       <div class="st-row">
-        <span class="st-row-label">Credits formula</span>
-        <span class="st-row-value">minutes ÷ 83.58</span>
-      </div>
-      ${rowDiv()}
-      <div class="st-row">
         <span class="st-row-label">Version</span>
         <span class="st-row-value">v0.4.0 · ${_ctapUser ? 'synced' : 'local'}</span>
       </div>
@@ -1379,13 +1373,14 @@ function buildSettings() {
         <span class="st-chevron${creditsInfoExpanded ? ' open' : ''}">›</span>
       </button>
       ${creditsInfoExpanded ? `<div class="st-credits-body">
+        <div class="st-kv"><span class="st-k">Formula</span><span class="st-v">minutes ÷ 83.58</span></div>
         <div class="st-kv"><span class="st-k">Bonus</span><span class="st-v">Earned credit hours ≥ adjusted target hours</span></div>
         <div class="st-kv"><span class="st-k">Adjusted target</span><span class="st-v">Base hours − deductions − leave hours</span></div>
         <div class="st-kv"><span class="st-k">Storage</span><span class="st-v">${_ctapUser ? 'Synced to your account.' : 'All data is on this device.'}</span></div>
       </div>` : ''}
       ${rowDiv()}
       <div class="st-row">
-        <span class="st-row-label">Made by</span>
+        <span class="st-row-label">Created & designed by</span>
         <a href="mailto:jake.rainford@britishgas.co.uk" class="st-row-link">Jake Rainford</a>
       </div>
     </div>
@@ -2441,25 +2436,27 @@ function attachListeners() {
     });
   });
 
-  // Settings steppers
-  function bindStepper(decId, incId, get, set, min, max, step) {
-    const dec = document.getElementById(decId);
-    const inc = document.getElementById(incId);
-    if (dec) dec.addEventListener('click', () => { set(Math.max(min, get() - step)); saveState(state); showToast('✓ Saved'); render(); });
-    if (inc) inc.addEventListener('click', () => { set(Math.min(max, get() + step)); saveState(state); showToast('✓ Saved'); render(); });
-  }
-  bindStepper('base-hours-dec', 'base-hours-inc',
-    () => state.baseHours || 40,
-    v => { state.baseHours = v; },
-    1, 80, 1);
-  bindStepper('wk-pct-dec', 'wk-pct-inc',
-    () => Math.round((typeof state.weeklyTargetPct === 'number' ? state.weeklyTargetPct : 0.8) * 100),
-    v => { state.weeklyTargetPct = v / 100; },
-    50, 100, 5);
-  bindStepper('start-bal-dec', 'start-bal-inc',
-    () => state.startingBalance || 0,
-    v => { state.startingBalance = v; },
-    -999, 999, 1);
+  // Settings target inputs
+  const hoursInput = document.getElementById('base-hours-input');
+  if (hoursInput) hoursInput.addEventListener('change', () => {
+    state.baseHours = Math.max(1, Math.min(80, parseInt(hoursInput.value) || 40));
+    hoursInput.value = state.baseHours;
+    saveState(state); showToast('✓ Saved');
+  });
+  const pctInput = document.getElementById('wk-pct-input');
+  if (pctInput) pctInput.addEventListener('change', () => {
+    const v = Math.max(50, Math.min(100, parseInt(pctInput.value) || 80));
+    state.weeklyTargetPct = v / 100;
+    pctInput.value = v;
+    saveState(state); showToast('✓ Saved');
+  });
+  const balInput = document.getElementById('start-bal-input');
+  if (balInput) balInput.addEventListener('change', () => {
+    const v = Math.max(-999, Math.min(999, parseFloat(balInput.value) || 0));
+    state.startingBalance = parseFloat(v.toFixed(1));
+    balInput.value = state.startingBalance.toFixed(1);
+    saveState(state); showToast('✓ Saved');
+  });
 
   // Settings info popovers
   document.querySelectorAll('.st-info-btn').forEach(btn => {

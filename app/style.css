@@ -635,35 +635,36 @@ body {
 }
 
 /* Stepper control */
-.st-stepper {
+.st-num-wrap {
   display: flex;
   align-items: center;
-  gap: 0;
-  border: 1px solid var(--tile-border);
-  border-radius: 99px;
-  overflow: hidden;
+  gap: 2px;
   background: var(--surface2);
+  border: 1px solid var(--tile-border);
+  border-radius: 10px;
+  padding: 4px 10px;
 }
-.st-step-btn {
+.st-num-input {
   background: none;
   border: none;
-  color: var(--accent);
-  font-size: 1rem;
-  font-weight: 700;
-  padding: 4px 10px;
-  cursor: pointer;
-  line-height: 1;
-  -webkit-tap-highlight-color: transparent;
-}
-.st-step-btn:active { background: var(--surface3); }
-.st-step-val {
-  font-size: 0.8rem;
+  color: var(--fg);
+  font-size: 0.88rem;
   font-weight: 600;
-  color: var(--text);
-  min-width: 38px;
-  text-align: center;
+  font-family: inherit;
   font-variant-numeric: tabular-nums;
-  padding: 0 2px;
+  width: 48px;
+  text-align: right;
+  outline: none;
+  -moz-appearance: textfield;
+  -webkit-appearance: none;
+  appearance: none;
+}
+.st-num-input::-webkit-inner-spin-button,
+.st-num-input::-webkit-outer-spin-button { -webkit-appearance: none; margin: 0; }
+.st-num-unit {
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: var(--muted);
 }
 
 /* Info button & popover */
