@@ -653,7 +653,7 @@ body {
   font-family: inherit;
   font-variant-numeric: tabular-nums;
   width: 48px;
-  text-align: right;
+  text-align: center;
   outline: none;
   -moz-appearance: textfield;
   -webkit-appearance: none;

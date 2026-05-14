@@ -485,10 +485,7 @@ function buildSchedule() {
   const defaultLunch = state.defaultLunch !== undefined ? state.defaultLunch : 30;
   const lunchLabels = { 0: 'No lunch', 15: '15 min', 30: '30 min', 45: '45 min', 60: '1 hour' };
 
-  const satShift = shifts[days[5]] || {};
-  const sunShift = shifts[days[6]] || {};
-  const hasWeekendShift = !!(satShift.start || sunShift.start || satShift.leave || sunShift.leave);
-  const showWeekend = weekendExpanded || hasWeekendShift;
+  // Always show the full week
 
   // "11 – 17 May" or "26 Apr – 2 May"
   function schedWeekLabel(wk) {
@@ -509,14 +506,7 @@ function buildSchedule() {
     return `<div class="shift-row${isToday ? ' shift-today' : ''}${isLeave ? ' shift-leave' : ''}"><div class="sched-day-col${isToday ? ' is-today' : ''}"><span class="sched-day-abbr">${DAY_ABBR[i]}</span><span class="sched-day-num">${dayNum}</span></div>${isLeave ? `<div class="sched-leave-label">Annual leave</div>` : `<div class="sched-time-wrap"><input type="time" class="shift-input" data-day="${dk}" data-field="start" value="${s.start || ''}"><span class="shift-sep">–</span><input type="time" class="shift-input" data-day="${dk}" data-field="end" value="${s.end || ''}"></div>`}<span class="sched-hrs${isToday ? ' is-today' : ''}">${isLeave ? 'AL' : hrs !== null ? hrs.toFixed(1) + 'h' : '—'}</span><button class="al-btn${isLeave ? ' active' : ''}" data-day="${dk}" data-action="toggle-leave">${isLeave ? '✓ Leave' : 'Leave'}</button></div>`;
   }
 
-  const weekdayRows = days.slice(0, 5).map((dk, i) => buildDayRow(dk, i)).join('');
-  const weekendRows = showWeekend
-    ? `<div class="shift-weekend-expanded">${buildDayRow(days[5], 5)}${buildDayRow(days[6], 6)}</div>`
-    : `<div class="shift-weekend-collapsed">
-        <span class="shift-weekend-label">SAT / SUN</span>
-        <span class="shift-weekend-off">Off — no shift</span>
-        <button id="weekend-add-shift" class="shift-weekend-add">+ Add shift</button>
-      </div>`;
+  const weekdayRows = days.map((dk, i) => buildDayRow(dk, i)).join('');
 
   const todayWk = getWeekKey(new Date());
   const isFuture = currentWeekKey > todayWk;
@@ -540,7 +530,6 @@ function buildSchedule() {
     ${isFuture ? `<div style="background:rgba(255,165,36,0.08);border:1px solid rgba(255,165,36,0.2);border-radius:10px;padding:10px 14px;margin-bottom:10px;font-size:0.76rem;color:var(--accent);line-height:1.5"><strong>Future week</strong> — Set your schedule in advance.</div>` : ''}
     <div class="dashboard-card" style="padding:2px 12px">
       ${weekdayRows}
-      ${weekendRows}
     </div>
     <div class="dashboard-card default-lunch-card">
       <div class="default-lunch-row">
@@ -1288,8 +1277,6 @@ function buildSettings() {
   const rowDiv = () => `<div class="st-row-divider"></div>`;
   const numInput = (id, val, unit = '', extra = '') =>
     `<div class="st-num-wrap"><input type="number" id="${id}" class="st-num-input" value="${val}" ${extra}><span class="st-num-unit">${unit}</span></div>`;
-  const stepper = (id, val, unit = '') =>
-    `<div class="st-stepper"><button class="st-step-btn" id="${id}-dec">−</button><span class="st-step-val">${val}${unit}</span><button class="st-step-btn" id="${id}-inc">+</button></div>`;
   const infoBtn = key =>
     `<button class="st-info-btn${openSettingsInfo === key ? ' active' : ''}" data-info="${key}">i</button>`;
   const infoPopover = text => `<div class="st-info-popover">${text}</div>`;
@@ -1331,7 +1318,7 @@ function buildSettings() {
       <div class="st-row">
         <span class="st-row-label">Target %</span>
         <div class="st-row-controls">
-          ${stepper('wk-pct', wkPct, '%')}
+          ${numInput('wk-pct-input', wkPct, '%', 'min="50" max="100" inputmode="numeric"')}
           ${infoBtn('pct')}
         </div>
       </div>
@@ -2316,12 +2303,6 @@ function attachListeners() {
     });
   });
 
-  // Weekend expand
-  const weekendAddBtn = document.getElementById('weekend-add-shift');
-  if (weekendAddBtn) weekendAddBtn.addEventListener('click', () => {
-    weekendExpanded = true;
-    render();
-  });
 
   // Default lunch chip — cycle through options
   const defaultLunchChip = document.getElementById('default-lunch-chip');
@@ -2440,31 +2421,30 @@ function attachListeners() {
     });
   });
 
-  // Settings target inputs
-  const hoursInput = document.getElementById('base-hours-input');
-  if (hoursInput) hoursInput.addEventListener('change', () => {
-    state.baseHours = Math.max(1, Math.min(80, parseInt(hoursInput.value) || 40));
-    hoursInput.value = state.baseHours;
-    saveState(state); showToast('✓ Saved');
-  });
-  const balInput = document.getElementById('start-bal-input');
-  if (balInput) balInput.addEventListener('change', () => {
-    const v = Math.max(-999, Math.min(999, parseFloat(balInput.value) || 0));
-    state.startingBalance = parseFloat(v.toFixed(1));
-    balInput.value = state.startingBalance.toFixed(1);
-    saveState(state); showToast('✓ Saved');
-  });
-  // Target % stepper
-  const pctDec = document.getElementById('wk-pct-dec');
-  const pctInc = document.getElementById('wk-pct-inc');
-  if (pctDec) pctDec.addEventListener('click', () => {
-    state.weeklyTargetPct = Math.max(0.5, (state.weeklyTargetPct || 0.8) - 0.05);
-    saveState(state); showToast('✓ Saved'); render();
-  });
-  if (pctInc) pctInc.addEventListener('click', () => {
-    state.weeklyTargetPct = Math.min(1.0, (state.weeklyTargetPct || 0.8) + 0.05);
-    saveState(state); showToast('✓ Saved'); render();
-  });
+  // Settings target inputs — clear on focus, save on blur/change
+  function bindNumInput(id, setFn, parseFn, restoreFn) {
+    const el = document.getElementById(id);
+    if (!el) return;
+    el.addEventListener('focus', () => { el.value = ''; });
+    el.addEventListener('blur', () => {
+      const v = parseFn(el.value);
+      if (el.value === '' || isNaN(v)) { el.value = restoreFn(); return; }
+      setFn(v); el.value = restoreFn();
+      saveState(state); showToast('✓ Saved');
+    });
+  }
+  bindNumInput('base-hours-input',
+    v => { state.baseHours = v; },
+    v => Math.max(1, Math.min(80, parseInt(v) || 40)),
+    () => state.baseHours || 40);
+  bindNumInput('wk-pct-input',
+    v => { state.weeklyTargetPct = v / 100; },
+    v => Math.max(50, Math.min(100, parseInt(v) || 80)),
+    () => Math.round((state.weeklyTargetPct || 0.8) * 100));
+  bindNumInput('start-bal-input',
+    v => { state.startingBalance = parseFloat(v.toFixed(1)); },
+    v => Math.max(-999, Math.min(999, parseFloat(v) || 0)),
+    () => (state.startingBalance || 0).toFixed(1));
 
   // Settings info popovers
   document.querySelectorAll('.st-info-btn').forEach(btn => {
