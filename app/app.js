@@ -12,6 +12,7 @@ let dayEditMode = false;
 let activeLogDay = getTodayKey();
 let jobSearch = '';
 let ctapProjectedMode = false;
+let expandedZeroWeek = null;
 let graphWeekKey = getWeekKey(new Date());
 let _ctapUser = null;          // populated by __ctapInit
 let _ctapDisplayName = '';     // populated by __ctapInit
@@ -1204,53 +1205,51 @@ function buildHistory() {
   if (chartWeeks.length >= 1) {
     const hitCount = chartWeeks.filter(wk => bonusAchieved(state, state.weeks[wk])).length;
     const cols = chartWeeks.map(wk => {
-      const week = state.weeks[wk];
+      const week  = state.weeks[wk];
       const earned = weekCreditHours(week);
-      const target = adjustedTargetHours(state, week);
-      const pct    = target > 0 ? (earned / target) * 100 : (earned > 0 ? 100 : 0);
-      const colour = pct >= 90 ? 'green' : pct >= 70 ? 'amber' : earned === 0 ? 'grey' : 'red';
-      return `
-        <div class="trend-col" data-goto-week="${wk}" style="cursor:pointer">
-          <div class="trend-track">
-            <div class="trend-fill ${colour}" style="height:${Math.min(pct, 100).toFixed(0)}%"></div>
-          </div>
-          <div class="trend-wk-label">W${isoWkNum(wk)}</div>
-        </div>`;
+      const bonus  = bonusAchieved(state, week);
+      const barH   = Math.max(4, (earned / 45) * 64);
+      const barCls = earned === 0 ? 'zero' : bonus ? 'green' : 'grey';
+      return `<div class="trend-col" data-goto-week="${wk}"><div class="trend-bar ${barCls}" style="height:${barH.toFixed(1)}px"></div><div class="trend-wk-label${bonus ? ' green' : ''}">W${isoWkNum(wk)}</div></div>`;
     }).join('');
     trendHTML = `
       <div class="trend-chart-wrap">
         <div class="trend-header">
-          <span class="trend-title">Weekly trend</span>
-          <span class="trend-stat">${hitCount} / ${chartWeeks.length} weeks bonus</span>
+          <span class="trend-title">WEEKLY TREND</span>
+          <span class="trend-stat"><span${hitCount > 0 ? ' style="color:var(--green)"' : ''}>${hitCount}</span> / ${chartWeeks.length} weeks bonus</span>
         </div>
         <div class="trend-chart">${cols}</div>
       </div>`;
   }
 
   const list = weeks.map(wk => {
-    const week = state.weeks[wk];
-    const earned = weekCreditHours(week);
-    const target = adjustedTargetHours(state, week);
-    const pct    = target > 0 ? (earned / target) * 100 : 0;
-    const bonus  = bonusAchieved(state, week);
-    const colour = pct >= 90 ? 'green' : pct >= 70 ? 'amber' : earned === 0 ? 'grey' : 'red';
+    const week    = state.weeks[wk];
+    const earned  = weekCreditHours(week);
+    const target  = adjustedTargetHours(state, week);
+    const pct     = target > 0 ? (earned / target) * 100 : 0;
+    const bonus   = bonusAchieved(state, week);
+    const colour  = pct >= 90 ? 'green' : pct >= 70 ? 'amber' : earned === 0 ? 'grey' : 'red';
     const isCurrent = wk === currentWeekKey;
     const isPast    = wk < currentWk;
     const excluded  = week.excludeFromCtap || false;
+    const isZero    = earned === 0 && isPast;
+    const expanded  = expandedZeroWeek === wk;
+    const showDetails = !isZero || expanded;
     return `
       <div class="history-item" data-goto-week="${wk}">
         <div class="hi-left">
           <div class="hi-week">${weekLabel(wk)}${isCurrent ? ' (current)' : ''}</div>
           <div class="hi-credits">${earned.toFixed(2)}h / ${target.toFixed(2)}h target — ${bonus ? 'Bonus ✓' : pct >= 90 ? 'On track' : pct >= 70 ? 'Amber zone' : 'Below target'}</div>
           ${week.note ? `<div class="hi-note">${week.note}</div>` : ''}
-          ${isPast ? `<button class="ctap-toggle-btn${excluded ? ' excluded' : ''}" data-week-key="${wk}">${excluded ? '✕ Excluded from CTAP' : '✓ In CTAP'}</button>` : ''}
-          ${isPast ? `<div class="hi-retro">
+          ${showDetails && isPast ? `<button class="ctap-toggle-btn${excluded ? ' excluded' : ''}" data-week-key="${wk}">${excluded ? '✕ Excluded from CTAP' : '✓ In CTAP'}</button>` : ''}
+          ${showDetails && isPast ? `<div class="hi-retro">
             <div class="hi-retro-field">
               <span class="hi-retro-label">Travel</span>
               <input type="number" class="retro-input" data-retro-field="travelHours" data-week-key="${wk}" value="${week.travelHours != null ? week.travelHours : ''}" placeholder="0.00" step="0.01" min="0">
               <span class="hi-retro-unit">h</span>
             </div>
           </div>` : ''}
+          ${isZero && !expanded ? `<div class="hi-zero-hint">Tap for details ›</div>` : ''}
         </div>
         <div class="history-dot ${colour}"></div>
       </div>`;
@@ -2451,10 +2450,20 @@ function attachListeners() {
     el.addEventListener('click', e => {
       if (e.target.closest('.hi-retro')) return;
       const wk = el.dataset.gotoWeek;
+      // Zero-hour past history items expand/collapse instead of navigating
+      if (el.classList.contains('history-item')) {
+        const week = state.weeks[wk];
+        const earned = week ? weekCreditHours(week) : 0;
+        if (earned === 0 && wk < getWeekKey(new Date())) {
+          expandedZeroWeek = expandedZeroWeek === wk ? null : wk;
+          render();
+          return;
+        }
+      }
       currentWeekKey = wk;
       activeTab = 'dashboard';
       weekSummaryKey = wk < getWeekKey(new Date()) ? wk : null;
-      if (weekSummaryKey) activeDayKey = weekDays(wk)[0]; // default to Monday
+      if (weekSummaryKey) activeDayKey = weekDays(wk)[0];
       render();
     });
   });
