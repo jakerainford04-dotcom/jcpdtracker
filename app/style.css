@@ -733,10 +733,18 @@ body {
 .history-dot.grey  { background: var(--surface3); }
 .hi-zero-hint { font-size: 0.72rem; color: var(--muted2); margin-top: 6px; }
 
+/* ── History: inline excluded + travel row ── */
+.hi-details-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-top: 8px;
+  flex-wrap: wrap;
+}
+
 /* ── CTAP week toggle ── */
 .ctap-toggle-btn {
   display: inline-block;
-  margin-top: 7px;
   padding: 3px 10px;
   font-size: 0.68rem;
   font-weight: 600;
@@ -753,12 +761,6 @@ body {
 }
 
 /* ── Retrospective inputs (History tab) ── */
-.hi-retro {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 10px;
-  margin-top: 9px;
-}
 .hi-retro-field {
   display: flex;
   align-items: center;

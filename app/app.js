@@ -1241,8 +1241,8 @@ function buildHistory() {
           <div class="hi-week">${weekLabel(wk)}${isCurrent ? ' (current)' : ''}</div>
           <div class="hi-credits">${earned.toFixed(2)}h / ${target.toFixed(2)}h target — ${bonus ? 'Bonus ✓' : pct >= 90 ? 'On track' : pct >= 70 ? 'Amber zone' : 'Below target'}</div>
           ${week.note ? `<div class="hi-note">${week.note}</div>` : ''}
-          ${showDetails && isPast ? `<button class="ctap-toggle-btn${excluded ? ' excluded' : ''}" data-week-key="${wk}">${excluded ? '✕ Excluded from CTAP' : '✓ In CTAP'}</button>` : ''}
-          ${showDetails && isPast ? `<div class="hi-retro">
+          ${showDetails && isPast ? `<div class="hi-details-row">
+            <button class="ctap-toggle-btn${excluded ? ' excluded' : ''}" data-week-key="${wk}">${excluded ? '✕ Excluded' : '✓ In CTAP'}</button>
             <div class="hi-retro-field">
               <span class="hi-retro-label">Travel</span>
               <input type="number" class="retro-input" data-retro-field="travelHours" data-week-key="${wk}" value="${week.travelHours != null ? week.travelHours : ''}" placeholder="0.00" step="0.01" min="0">
