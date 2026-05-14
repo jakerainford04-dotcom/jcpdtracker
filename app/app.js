@@ -2897,7 +2897,8 @@ function buildCoachLogBanner() {
   if (todayHours >= dailyTarget) return '';
   const gap = dailyTarget - todayHours;
   const all = [...JOB_TYPES.core, ...JOB_TYPES.hive, ...JOB_TYPES.sales];
-  const fixed = all.filter(j => !j.variable && !j.isMentorFull && !j.isMentorPartial && !j.isNpt && j.minutes > 0);
+  const EXCLUDE_FROM_BEST = new Set(['ld_completed', 'trace_repair']);
+  const fixed = all.filter(j => !j.variable && !j.isMentorFull && !j.isMentorPartial && !j.isNpt && j.minutes > 0 && !EXCLUDE_FROM_BEST.has(j.id));
   const bestJob = fixed.reduce((b, j) => j.minutes > b.minutes ? j : b, fixed[0]);
   let text = '';
   if (gap <= 1.0 + 0.05) {
