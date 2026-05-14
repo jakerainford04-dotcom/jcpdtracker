@@ -38,7 +38,12 @@ const JOB_TYPES = {
     { id: 'rchv_trv', code: 'RCHV-TRV', name: 'Recall Hive TRVs', minutes: 56, credits: 0.67, variable: false }
   ],
   sales: [
-    { id: 'hi_lead', name: 'HI Lead (Boiler Lead)', minutes: 58, credits: 0.69, variable: false }
+    { id: 'hi_lead',          name: 'HI Lead (Boiler Lead)',        minutes: 58,  credits: 0.69, variable: false },
+    { id: 'inhibitor',        name: 'Inhibitor (Fit + SGO)',         minutes: 51,  credits: 0.61, variable: false },
+    { id: 'hive_sale_sgo',    name: 'Hive Sale (SGO Credit)',        minutes: 69,  credits: 0.82, variable: false },
+    { id: 'hive_sale_fit',    name: 'Hive Fit (Sale Job)',           minutes: 125, credits: 1.50, variable: false },
+    { id: 'co_alarm_sgo',     name: 'CO Alarm – Sell (SGO Credit)',  minutes: 10,  credits: 0.12, variable: false },
+    { id: 'co_alarm_fit',     name: 'CO Alarm – Fit Only',           minutes: 7,   credits: 0.08, variable: false }
   ],
   absent: [
     { id: 'wait_work', name: 'Wait Work', minutes: 60, credits: 0.72, variable: true, variableType: 'hours', variablePrompt: 'Time in hours' },
