@@ -1,4 +1,4 @@
-const CACHE = 'jct-v17';
+const CACHE = 'jct-v18';
 const BASE  = '/jcpdtracker';
 
 self.addEventListener('install', e => {

@@ -278,7 +278,8 @@ function buildDashboard() {
 
   // ── Pace line for Today card ──
   let paceLine = '';
-  if (isCurrentWeek && !dayIsLeave(week, todayKey) && dailyTargetHours > 0) {
+  const _isMentorFull = (week.mentorDays || {})[todayKey] === 'full';
+  if (isCurrentWeek && !dayIsLeave(week, todayKey) && !_isMentorFull) {
     const _cur = new Date().getHours() * 60 + new Date().getMinutes();
     const _sh  = (week.shifts || {})[todayKey] || {};
     let _startM = 480, _endM = 990;
@@ -293,20 +294,13 @@ function buildDashboard() {
       ? `${Math.floor(_remain / 60)}h ${String(_remain % 60).padStart(2, '0')}m left`
       : `${_remain}m left`;
     if (_cur >= _endM) {
-      const _g = todayHours - dailyTargetHours;
-      paceLine = `<div class="split-pace ${_g >= 0 ? 'pace-green' : 'pace-red'}">${_g >= 0 ? 'Shift complete · target hit ✓' : 'Shift complete · below target'}</div>`;
+      paceLine = `<div class="split-pace pace-muted">Shift complete · ${todayHours.toFixed(2)}h earned</div>`;
     } else if (_cur < _startM) {
       const _m = _startM - _cur;
       paceLine = `<div class="split-pace pace-muted">Starts in ${_m >= 60 ? Math.floor(_m/60)+'h '+_m%60+'m' : _m+'m'}</div>`;
     } else if (todayHours > 0 && _worked >= 15) {
       const _proj = todayHours + (todayHours / _worked) * _remain;
-      const _gap  = _proj - dailyTargetHours;
-      if (_gap >= 0) {
-        paceLine = `<div class="split-pace pace-green">On pace · ${_remStr}</div>`;
-      } else {
-        const _n = Math.ceil(Math.abs(_gap) / (56 / 60));
-        paceLine = `<div class="split-pace pace-red">${_n} job${_n === 1 ? '' : 's'} to catch up · ${_remStr}</div>`;
-      }
+      paceLine = `<div class="split-pace pace-muted">Pacing for ${_proj.toFixed(2)}h today · ${_remStr}</div>`;
     } else if (_remain > 0) {
       paceLine = `<div class="split-pace pace-muted">${_remStr}</div>`;
     }
@@ -1395,16 +1389,13 @@ function buildDayDetailPanel(weekKey, week, dk, editMode) {
   const mentor = (week.mentorDays || {})[dk];
   const isLeave = dayIsLeave(week, dk);
   const creditsH = jobs.reduce((s, j) => s + j.creditMins, 0) / 60;
-  const rawTarget = getDailyTarget(state, week, dk);
   const dateLabel = new Date(dk + 'T00:00:00').toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'short' });
   const isEmpty = jobs.length === 0 && dayDeds.length === 0 && !mentor && !isLeave;
-  const earnColour = !isLeave && creditsH > 0 && creditsH >= rawTarget ? 'green' : '';
 
   const header = `<div class="ddp-header">
     <div class="ddp-date">${dateLabel}</div>
     <div class="ddp-stats-row">
-      <span class="ddp-stat">Target <span class="ddp-stat-val${isLeave ? ' ddp-amber' : ''}">${isLeave ? '0h' : rawTarget.toFixed(2) + 'h'}</span></span>
-      <span class="ddp-stat">Earned <span class="ddp-stat-val ${earnColour}">${creditsH.toFixed(2)}h</span></span>
+      <span class="ddp-stat">Earned <span class="ddp-stat-val">${isLeave ? '—' : creditsH.toFixed(2) + 'h'}</span></span>
     </div>
   </div>`;
 
@@ -1463,15 +1454,26 @@ function buildDayDetailPanel(weekKey, week, dk, editMode) {
   return `<div class="day-detail-panel">
     ${header}
     ${isEmpty
-      ? '<div class="ddp-empty">Nothing logged</div>'
+      ? `<button class="ddp-empty-btn" data-log-day="${dk}">Nothing logged<span class="ddp-empty-arrow"> · tap to log →</span></button>`
       : `<div class="ddp-list">${leaveRow}${jobRows}${dedRows}${mentorRow}</div>
-         <div class="ddp-total"><span class="ddp-total-label">Day total</span><span class="ddp-total-val ${earnColour}">${creditsH.toFixed(2)}h</span></div>
+         <div class="ddp-total"><span class="ddp-total-label">Day total</span><span class="ddp-total-val">${creditsH.toFixed(2)}h</span></div>
          ${editTimesBtn}`
     }
   </div>`;
 }
 
 function handleSheetInteraction(e) {
+  const logDayBtn = e.target.closest('[data-log-day]');
+  if (logDayBtn) {
+    e.stopPropagation();
+    forecastSheetOpen = false;
+    weekSummaryKey = null;
+    activeLogDay = logDayBtn.dataset.logDay;
+    activeTab = 'log';
+    render();
+    return;
+  }
+
   const pill = e.target.closest('[data-strip-day]');
   if (pill) {
     e.stopPropagation();
