@@ -1286,6 +1286,8 @@ function buildSettings() {
   const rowDiv = () => `<div class="st-row-divider"></div>`;
   const numInput = (id, val, unit = '', extra = '') =>
     `<div class="st-num-wrap"><input type="number" id="${id}" class="st-num-input" value="${val}" ${extra}><span class="st-num-unit">${unit}</span></div>`;
+  const stepper = (id, val, unit = '') =>
+    `<div class="st-stepper"><button class="st-step-btn" id="${id}-dec">−</button><span class="st-step-val">${val}${unit}</span><button class="st-step-btn" id="${id}-inc">+</button></div>`;
   const infoBtn = key =>
     `<button class="st-info-btn${openSettingsInfo === key ? ' active' : ''}" data-info="${key}">i</button>`;
   const infoPopover = text => `<div class="st-info-popover">${text}</div>`;
@@ -1327,7 +1329,7 @@ function buildSettings() {
       <div class="st-row">
         <span class="st-row-label">Target %</span>
         <div class="st-row-controls">
-          ${numInput('wk-pct-input', wkPct, '%', 'min="50" max="100" inputmode="numeric"')}
+          ${stepper('wk-pct', wkPct, '%')}
           ${infoBtn('pct')}
         </div>
       </div>
@@ -2443,19 +2445,23 @@ function attachListeners() {
     hoursInput.value = state.baseHours;
     saveState(state); showToast('✓ Saved');
   });
-  const pctInput = document.getElementById('wk-pct-input');
-  if (pctInput) pctInput.addEventListener('change', () => {
-    const v = Math.max(50, Math.min(100, parseInt(pctInput.value) || 80));
-    state.weeklyTargetPct = v / 100;
-    pctInput.value = v;
-    saveState(state); showToast('✓ Saved');
-  });
   const balInput = document.getElementById('start-bal-input');
   if (balInput) balInput.addEventListener('change', () => {
     const v = Math.max(-999, Math.min(999, parseFloat(balInput.value) || 0));
     state.startingBalance = parseFloat(v.toFixed(1));
     balInput.value = state.startingBalance.toFixed(1);
     saveState(state); showToast('✓ Saved');
+  });
+  // Target % stepper
+  const pctDec = document.getElementById('wk-pct-dec');
+  const pctInc = document.getElementById('wk-pct-inc');
+  if (pctDec) pctDec.addEventListener('click', () => {
+    state.weeklyTargetPct = Math.max(0.5, (state.weeklyTargetPct || 0.8) - 0.05);
+    saveState(state); showToast('✓ Saved'); render();
+  });
+  if (pctInc) pctInc.addEventListener('click', () => {
+    state.weeklyTargetPct = Math.min(1.0, (state.weeklyTargetPct || 0.8) + 0.05);
+    saveState(state); showToast('✓ Saved'); render();
   });
 
   // Settings info popovers
