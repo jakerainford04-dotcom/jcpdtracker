@@ -2416,16 +2416,27 @@ function attachListeners() {
   });
 
   // Theme toggle (segmented control)
+  function applyTheme(theme) {
+    document.body.classList.toggle('light', theme === 'light');
+    localStorage.setItem('jcpd_theme', theme);
+    if (window.__ctapSyncProfile) window.__ctapSyncProfile({ theme });
+    showToast('✓ Saved');
+    render();
+  }
   document.querySelectorAll('.theme-btn').forEach(btn => {
-    btn.addEventListener('click', () => {
-      const theme = btn.dataset.theme;
-      document.body.classList.toggle('light', theme === 'light');
-      localStorage.setItem('jcpd_theme', theme);
-      if (window.__ctapSyncProfile) window.__ctapSyncProfile({ theme });
-      showToast('✓ Saved');
-      render();
-    });
+    btn.addEventListener('click', () => applyTheme(btn.dataset.theme));
   });
+  // Swipe on the segmented control: right → light, left → dark
+  const themeSeg = document.querySelector('.st-seg');
+  if (themeSeg) {
+    let _swipeX = 0;
+    themeSeg.addEventListener('touchstart', e => { _swipeX = e.touches[0].clientX; }, { passive: true });
+    themeSeg.addEventListener('touchend', e => {
+      const dx = e.changedTouches[0].clientX - _swipeX;
+      if (Math.abs(dx) < 24) return;
+      applyTheme(dx > 0 ? 'light' : 'dark');
+    }, { passive: true });
+  }
 
   // Settings target inputs — clear on focus, save on blur/change
   function bindNumInput(id, setFn, parseFn, restoreFn) {
