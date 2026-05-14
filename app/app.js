@@ -17,6 +17,78 @@ let _ctapUser = null;          // populated by __ctapInit
 let _ctapDisplayName = '';     // populated by __ctapInit
 let _isOffline = false;
 
+// ── Job tile display metadata ───────────────────────────────────────────────
+const JOB_META = {
+  // Core
+  ib_ff:               { short: 'Breakdown',            sub: 'First fix · all appliances' },
+  linked_ib:           { short: 'Linked Breakdown',     sub: 'Same appliance as ann. service' },
+  asv_chb_cir_wh_swh:  { short: 'Annual Service',       sub: 'CHB, CIR, WH, SWH' },
+  asv_fre:             { short: 'Annual Service',        sub: 'FRE' },
+  fv_chb:              { short: 'First Visit',           sub: 'CHB' },
+  ld_completed:        { short: 'Long Duration',         sub: 'Completed' },
+  oca:                 { short: 'OCA',                   sub: 'All appliance types' },
+  remedial_safety:     { short: 'Remedial Safety',       sub: 'First visit only' },
+  asv_bbf_wau_waw_aga: { short: 'Annual Service',        sub: 'BBF, WAU, WAW, AGA' },
+  fv_bbf_wau_waw:      { short: 'First Visit',           sub: 'BBF, WAU, WAW' },
+  as_inst:             { short: 'Annual Service INST',   sub: 'Landlords inspection' },
+  standalone_quote:    { short: 'Quote Job',             sub: 'Standalone' },
+  free_gas_safety:     { short: 'Gas Safety Check',      sub: 'Free check' },
+  upgrade_work:        { short: 'Upgrade Work',          sub: 'Variable · per hour quoted' },
+  trace_repair:        { short: 'Trace & Repair',        sub: 'Variable · mins on completion' },
+  install_cod:         { short: 'Install COD',           sub: '' },
+  hive_install_generic:{ short: 'Hive Install',          sub: 'Generic' },
+  asv_mwh_wal:         { short: 'Annual Service',        sub: 'MWH, WAL' },
+  asv_hob_ckr_ovn:     { short: 'Annual Service',        sub: 'HOB, CKR, OVN' },
+  // Hive
+  hvi_hub:    { short: 'Hive Install',         sub: 'OpenTherm upgrade' },
+  hvi_iio:    { short: 'Inday Install',        sub: 'Hive offer' },
+  hvi_min:    { short: 'Hive Install',         sub: 'Mini thermostat' },
+  hvi_imz:    { short: 'Hive Install',         sub: 'Multizone' },
+  hvi_trv:    { short: 'Hive Install',         sub: 'TRV' },
+  hvi_wls:    { short: 'Hive Install',         sub: 'Wireless thermostat' },
+  hvi_wrd:    { short: 'Hive Install',         sub: 'Wired thermostat' },
+  hvr_the:    { short: 'Hive Repair',          sub: 'Thermostat' },
+  hvr_trv:    { short: 'Hive Repair',          sub: 'TRV' },
+  hvu_the:    { short: 'Hive Uninstall',       sub: 'Thermostat' },
+  inshv_min:  { short: 'Hive Mini Install',    sub: 'Solvers' },
+  inshv_thr:  { short: 'Hive Install',         sub: 'Thermostat · Solvers' },
+  inshv_trv:  { short: 'Hive TRV Install',     sub: 'Solvers · variable' },
+  rchv_thr:   { short: 'Recall Hive',          sub: 'Thermostat' },
+  rchv_trv:   { short: 'Recall Hive',          sub: 'TRVs' },
+  // Sales
+  hi_lead:        { short: 'HI Lead',          sub: 'Boiler lead' },
+  inhibitor:      { short: 'Inhibitor',         sub: 'Fit + SGO credit' },
+  hive_sale_sgo:  { short: 'Hive Sale',         sub: 'SGO credit' },
+  hive_sale_fit:  { short: 'Hive Fit',          sub: 'Sale job' },
+  co_alarm_sgo:   { short: 'CO Alarm Sell',     sub: 'SGO credit' },
+  co_alarm_fit:   { short: 'CO Alarm Fit',      sub: 'Fit only' },
+  // Absence
+  wait_work:         { short: 'Wait Work',          sub: 'Variable · hours' },
+  early_finish:      { short: 'Early Finish',        sub: 'NPT deduction' },
+  mentor_full:       { short: 'Mentor Support',      sub: 'Full day' },
+  mentor_partial:    { short: 'Mentor Support',      sub: '20% target reduction' },
+  ev_charge:         { short: 'EV Charging',         sub: '' },
+  buybox_collection: { short: 'Bybox Collection',    sub: 'Parts' },
+  merchant_parts:    { short: 'Merchant Parts',      sub: 'Collection' },
+  npt_quick:         { short: 'Non-Productive',      sub: 'Variable · minutes' },
+};
+
+function buildJobTileHTML(j) {
+  const meta = JOB_META[j.id] || {};
+  const shortName = meta.short || j.name;
+  const sub = meta.sub || '';
+  const creditsDisplay = j.variable ? 'Variable'
+    : j.isMentorFull ? 'Full day'
+    : j.isMentorPartial ? '−20% target'
+    : `+${(j.minutes / 60).toFixed(2)}h`;
+  return `<button class="job-btn${j.variable ? ' variable' : ''}" data-job-id="${j.id}">
+    <div class="jb-title"><span class="jb-name">${shortName}</span>${j.code ? `<span class="jb-code-inline"> (${j.code})</span>` : ''}</div>
+    ${sub ? `<span class="jb-sub">${sub}</span>` : ''}
+    <span class="jb-spacer"></span>
+    <span class="jb-credits">${creditsDisplay}</span>
+  </button>`;
+}
+
 // ── Init ───────────────────────────────────────────────────────────────────
 window.addEventListener('error', function(e) {
   var app = document.getElementById('app');
@@ -1089,11 +1161,7 @@ function buildLogJobs() {
       (j.code && j.code.toLowerCase().includes(q))
     );
     const gridHTML = filtered.length > 0
-      ? filtered.map(j => `<button class="job-btn${j.variable ? ' variable' : ''}" data-job-id="${j.id}">
-          ${j.code ? `<span class="jb-code">${j.code}</span>` : ''}
-          <span class="jb-name">${j.name}</span>
-          <span class="jb-credits">${j.variable ? 'Variable' : j.isMentorFull ? 'Full day' : j.isMentorPartial ? '−20% target' : `+${(j.minutes / 60).toFixed(2)}h`}</span>
-        </button>`).join('')
+      ? filtered.map(j => buildJobTileHTML(j)).join('')
       : `<div style="grid-column:1/-1;text-align:center;padding:24px 0;font-size:0.82rem;color:var(--muted)">No jobs match "${jobSearch}"</div>`;
     return `
       ${dayPickerHTML}
@@ -1115,11 +1183,7 @@ function buildLogJobs() {
     </div>
     ${activeJobTab === 'core' ? buildCoachLogBanner() : ''}
     <div class="job-grid">
-      ${jobs.map(j => `<button class="job-btn${j.variable ? ' variable' : ''}" data-job-id="${j.id}">
-          ${j.code ? `<span class="jb-code">${j.code}</span>` : ''}
-          <span class="jb-name">${j.name}</span>
-          <span class="jb-credits">${j.variable ? 'Variable' : j.isMentorFull ? 'Full day' : j.isMentorPartial ? '−20% target' : `+${(j.minutes / 60).toFixed(2)}h`}</span>
-        </button>`).join('')}
+      ${jobs.map(j => buildJobTileHTML(j)).join('')}
     </div>
     ${sessionBarHTML}
   `;

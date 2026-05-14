@@ -454,19 +454,20 @@ body {
 .job-grid {
   display: grid;
   grid-template-columns: 1fr 1fr;
-  gap: 8px;
+  gap: 10px;
 }
 .job-btn {
+  height: 124px;
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  padding: 12px 14px;
   background: var(--surface);
-  border-radius: var(--radius-sm);
-  padding: 14px 12px;
+  border-radius: 14px;
+  border: 1px solid var(--tile-border);
   color: var(--text);
   cursor: pointer;
   text-align: left;
-  display: flex;
-  flex-direction: column;
-  gap: 5px;
-  border: 1px solid var(--tile-border);
   transition: opacity 0.15s, background 0.35s;
   -webkit-tap-highlight-color: transparent;
 }
@@ -475,12 +476,37 @@ body {
   background: var(--accent);
   transition: background 0.07s;
 }
-.job-btn.logged .jb-name,
-.job-btn.logged .jb-code,
+.job-btn.logged .jb-title,
+.job-btn.logged .jb-code-inline,
+.job-btn.logged .jb-sub,
 .job-btn.logged .jb-credits { color: var(--jcpd-accent-ink); }
-.job-btn .jb-name    { font-size: 0.78rem; font-weight: 500; line-height: 1.3; }
-.job-btn .jb-code    { font-size: 0.63rem; color: var(--muted); font-weight: 500; }
-.job-btn .jb-credits { font-size: 0.72rem; color: var(--accent); font-weight: 700; }
+.jb-title {
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  line-height: 1.3;
+}
+.jb-name { font-size: 0.82rem; font-weight: 700; }
+.jb-code-inline { font-size: 0.72rem; color: var(--muted2); font-weight: 500; }
+.jb-sub {
+  font-size: 0.72rem;
+  color: var(--muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  margin-top: 3px;
+  flex-shrink: 0;
+}
+.jb-spacer { flex: 1; min-height: 4px; }
+.jb-credits {
+  font-size: 1.125rem;
+  font-weight: 600;
+  color: var(--accent);
+  letter-spacing: -0.01em;
+  font-variant-numeric: tabular-nums;
+  flex-shrink: 0;
+}
 .job-btn.variable .jb-credits { color: var(--amber); }
 
 /* ── Modal ── */
