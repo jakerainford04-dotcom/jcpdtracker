@@ -1098,7 +1098,10 @@ function buildLogJobs() {
   const logDayLabel = isLoggingToday
     ? 'Today · ' + logDayDate.toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short' })
     : logDayDate.toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'short' });
-  const minLogDate = new Date(); minLogDate.setDate(minLogDate.getDate() - 13);
+  const _logWeekKeys = Object.keys(state.weeks || {}).sort();
+  const minLogDate = _logWeekKeys.length > 0
+    ? new Date(_logWeekKeys[0] + 'T00:00:00')
+    : (() => { const d = new Date(); d.setFullYear(d.getFullYear() - 1); return d; })();
   const atMin = activeLogDay <= localDateStr(minLogDate);
   const dayPickerHTML = `
     <div class="day-picker">
@@ -2117,7 +2120,10 @@ function attachListeners() {
   if (logPrevDay) logPrevDay.addEventListener('click', () => {
     const d = new Date(activeLogDay + 'T00:00:00');
     d.setDate(d.getDate() - 1);
-    const minDate = new Date(); minDate.setDate(minDate.getDate() - 13);
+    const _wkKeys = Object.keys(state.weeks || {}).sort();
+    const minDate = _wkKeys.length > 0
+      ? new Date(_wkKeys[0] + 'T00:00:00')
+      : (() => { const fd = new Date(); fd.setFullYear(fd.getFullYear() - 1); return fd; })();
     const newKey = localDateStr(d);
     if (newKey >= localDateStr(minDate)) { activeLogDay = newKey; render(); }
   });
