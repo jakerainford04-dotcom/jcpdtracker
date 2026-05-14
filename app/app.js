@@ -479,7 +479,7 @@ function buildDashboard() {
 function buildSchedule() {
   const week = getOrCreateWeek(state, currentWeekKey);
   const shifts = week.shifts || {};
-  const DAY_ABBR = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+  const DAY_ABBR = ['MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT', 'SUN'];
   const days = weekDays(currentWeekKey);
   const todayKey = getTodayKey();
   const defaultLunch = state.defaultLunch !== undefined ? state.defaultLunch : 30;
@@ -490,36 +490,23 @@ function buildSchedule() {
   const hasWeekendShift = !!(satShift.start || sunShift.start || satShift.leave || sunShift.leave);
   const showWeekend = weekendExpanded || hasWeekendShift;
 
+  // "11 – 17 May" or "26 Apr – 2 May"
+  function schedWeekLabel(wk) {
+    const start = new Date(wk + 'T00:00:00');
+    const end = new Date(start); end.setDate(start.getDate() + 6);
+    const endStr = end.toLocaleDateString('en-GB', { day: 'numeric', month: 'short' });
+    if (start.getMonth() === end.getMonth()) return `${start.getDate()} – ${endStr}`;
+    return `${start.toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })} – ${endStr}`;
+  }
+
   function buildDayRow(dk, i) {
     const s = shifts[dk] || {};
     const hrs = shiftHours(s);
     const isLeave = !!(s.leave);
     const d = new Date(dk + 'T00:00:00');
-    const dateStr = d.toLocaleDateString('en-GB', { day: 'numeric', month: 'short' });
+    const dayNum = d.getDate();
     const isToday = dk === todayKey;
-    const lunchVal = s.lunch !== undefined ? s.lunch : '';
-    return `
-      <div class="shift-row${isToday ? ' shift-today' : ''}${isLeave ? ' shift-leave' : ''}">
-        <div class="shift-row-header">
-          <span class="shift-day-name">${DAY_ABBR[i]} <small${isToday ? ' class="today-date"' : ''}>${dateStr}</small>${isToday ? ' <span class="today-pip">TODAY</span>' : ''}</span>
-          <div style="display:flex;align-items:center;gap:8px">
-            <button class="al-btn${isLeave ? ' active' : ''}" data-day="${dk}" data-action="toggle-leave">${isLeave ? 'Leave ✓' : 'Leave'}</button>
-            <span class="shift-hrs">${isLeave ? 'AL' : hrs !== null ? hrs.toFixed(1) + 'h' : '—'}</span>
-          </div>
-        </div>
-        ${!isLeave ? `<div class="shift-row-inputs">
-          <input type="time" class="shift-input" data-day="${dk}" data-field="start" value="${s.start || ''}">
-          <span class="shift-sep">–</span>
-          <input type="time" class="shift-input" data-day="${dk}" data-field="end" value="${s.end || ''}">
-          <select class="shift-input shift-lunch-select" data-day="${dk}" data-field="lunch">
-            <option value="0"  ${lunchVal==='0'||lunchVal===0   ?'selected':''}>No lunch</option>
-            <option value="15" ${lunchVal==='15'||lunchVal===15  ?'selected':''}>15 min</option>
-            <option value="30" ${lunchVal==='30'||lunchVal===30||lunchVal===''?'selected':''}>30 min</option>
-            <option value="45" ${lunchVal==='45'||lunchVal===45  ?'selected':''}>45 min</option>
-            <option value="60" ${lunchVal==='60'||lunchVal===60  ?'selected':''}>1 hour</option>
-          </select>
-        </div>` : `<div style="font-size:0.75rem;color:var(--amber);padding:6px 0 2px">Annual leave — target hours deducted from weekly total</div>`}
-      </div>`;
+    return `<div class="shift-row${isToday ? ' shift-today' : ''}${isLeave ? ' shift-leave' : ''}"><div class="sched-day-col${isToday ? ' is-today' : ''}"><span class="sched-day-abbr">${DAY_ABBR[i]}</span><span class="sched-day-num">${dayNum}</span></div>${isLeave ? `<div class="sched-leave-label">Annual leave</div>` : `<div class="sched-time-wrap"><input type="time" class="shift-input" data-day="${dk}" data-field="start" value="${s.start || ''}"><span class="shift-sep">–</span><input type="time" class="shift-input" data-day="${dk}" data-field="end" value="${s.end || ''}"></div>`}<span class="sched-hrs${isToday ? ' is-today' : ''}">${isLeave ? 'AL' : hrs !== null ? hrs.toFixed(1) + 'h' : '—'}</span><button class="al-btn${isLeave ? ' active' : ''}" data-day="${dk}" data-action="toggle-leave">${isLeave ? '✓ Leave' : 'Leave'}</button></div>`;
   }
 
   const weekdayRows = days.slice(0, 5).map((dk, i) => buildDayRow(dk, i)).join('');
@@ -537,24 +524,18 @@ function buildSchedule() {
   const schedAtCap = currentWeekKey >= getWeekKey(maxFutureSched);
 
   return `
-    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
-      <div>
-        <div style="font-size:0.9rem;font-weight:700">Week Schedule</div>
-        <div style="display:flex;align-items:center;gap:4px;margin-top:4px">
-          <button id="sched-prev-week" class="inline-week-btn">&#8249;</button>
-          <span style="font-size:0.72rem;color:var(--muted)">${weekLabel(currentWeekKey)}</span>
-          <button id="sched-next-week" class="inline-week-btn" ${schedAtCap ? 'disabled' : ''}>&#8250;</button>
-        </div>
-      </div>
-      <button id="apply-default" style="background:var(--surface2);border:none;color:var(--accent);border-radius:8px;padding:6px 12px;font-size:0.75rem;font-weight:600;cursor:pointer">Standard week</button>
+    <div class="st-section-label">WEEK SCHEDULE</div>
+    <div class="sched-nav-row">
+      <button id="sched-prev-week" class="sched-nav-btn">&#8249;</button>
+      <span class="sched-nav-label">${schedWeekLabel(currentWeekKey)}</span>
+      <button id="sched-next-week" class="sched-nav-btn" ${schedAtCap ? 'disabled' : ''}>&#8250;</button>
+      <button id="apply-default" class="sched-standard-btn">Standard week</button>
     </div>
-    ${isFuture ? `<div style="background:rgba(255,165,36,0.08);border:1px solid rgba(255,165,36,0.2);border-radius:10px;padding:10px 14px;margin-bottom:12px;font-size:0.76rem;color:var(--accent);line-height:1.5">
-      <strong>Future week</strong> — Set your schedule in advance. Leave days will automatically reduce your target when this week becomes active on CTAP.
-    </div>` : ''}
     <div class="autosave-bar">
       <span id="autosave-check" class="autosave-check">✓</span>
       <span class="autosave-text">Saved automatically · Lunch deducted from daily target</span>
     </div>
+    ${isFuture ? `<div style="background:rgba(255,165,36,0.08);border:1px solid rgba(255,165,36,0.2);border-radius:10px;padding:10px 14px;margin-bottom:10px;font-size:0.76rem;color:var(--accent);line-height:1.5"><strong>Future week</strong> — Set your schedule in advance.</div>` : ''}
     <div class="dashboard-card" style="padding:2px 12px">
       ${weekdayRows}
       ${weekendRows}
