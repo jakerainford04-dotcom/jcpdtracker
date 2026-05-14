@@ -13,6 +13,7 @@ let activeLogDay = getTodayKey();
 let jobSearch = '';
 let ctapProjectedMode = false;
 let expandedZeroWeek = null;
+let weekendExpanded = false;
 let graphWeekKey = getWeekKey(new Date());
 let _ctapUser = null;          // populated by __ctapInit
 let _ctapDisplayName = '';     // populated by __ctapInit
@@ -478,8 +479,15 @@ function buildSchedule() {
   const DAY_ABBR = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
   const days = weekDays(currentWeekKey);
   const todayKey = getTodayKey();
+  const defaultLunch = state.defaultLunch !== undefined ? state.defaultLunch : 30;
+  const lunchLabels = { 0: 'No lunch', 15: '15 min', 30: '30 min', 45: '45 min', 60: '1 hour' };
 
-  const rows = days.map((dk, i) => {
+  const satShift = shifts[days[5]] || {};
+  const sunShift = shifts[days[6]] || {};
+  const hasWeekendShift = !!(satShift.start || sunShift.start || satShift.leave || sunShift.leave);
+  const showWeekend = weekendExpanded || hasWeekendShift;
+
+  function buildDayRow(dk, i) {
     const s = shifts[dk] || {};
     const hrs = shiftHours(s);
     const isLeave = !!(s.leave);
@@ -490,7 +498,7 @@ function buildSchedule() {
     return `
       <div class="shift-row${isToday ? ' shift-today' : ''}${isLeave ? ' shift-leave' : ''}">
         <div class="shift-row-header">
-          <span class="shift-day-name">${DAY_ABBR[i]} <small>${dateStr}</small>${isToday ? ' <span class="today-pip">TODAY</span>' : ''}</span>
+          <span class="shift-day-name">${DAY_ABBR[i]} <small${isToday ? ' class="today-date"' : ''}>${dateStr}</small>${isToday ? ' <span class="today-pip">TODAY</span>' : ''}</span>
           <div style="display:flex;align-items:center;gap:8px">
             <button class="al-btn${isLeave ? ' active' : ''}" data-day="${dk}" data-action="toggle-leave">${isLeave ? 'Leave ✓' : 'Leave'}</button>
             <span class="shift-hrs">${isLeave ? 'AL' : hrs !== null ? hrs.toFixed(1) + 'h' : '—'}</span>
@@ -509,7 +517,16 @@ function buildSchedule() {
           </select>
         </div>` : `<div style="font-size:0.75rem;color:var(--amber);padding:6px 0 2px">Annual leave — target hours deducted from weekly total</div>`}
       </div>`;
-  }).join('');
+  }
+
+  const weekdayRows = days.slice(0, 5).map((dk, i) => buildDayRow(dk, i)).join('');
+  const weekendRows = showWeekend
+    ? `<div class="shift-weekend-expanded">${buildDayRow(days[5], 5)}${buildDayRow(days[6], 6)}</div>`
+    : `<div class="shift-weekend-collapsed">
+        <span class="shift-weekend-label">SAT / SUN</span>
+        <span class="shift-weekend-off">Off — no shift</span>
+        <button id="weekend-add-shift" class="shift-weekend-add">+ Add shift</button>
+      </div>`;
 
   const todayWk = getWeekKey(new Date());
   const isFuture = currentWeekKey > todayWk;
@@ -531,11 +548,23 @@ function buildSchedule() {
     ${isFuture ? `<div style="background:rgba(255,165,36,0.08);border:1px solid rgba(255,165,36,0.2);border-radius:10px;padding:10px 14px;margin-bottom:12px;font-size:0.76rem;color:var(--accent);line-height:1.5">
       <strong>Future week</strong> — Set your schedule in advance. Leave days will automatically reduce your target when this week becomes active on CTAP.
     </div>` : ''}
-    <div class="dashboard-card" style="padding:2px 12px">
-      ${rows}
+    <div class="autosave-bar">
+      <span id="autosave-check" class="autosave-check">✓</span>
+      <span class="autosave-text">Saved automatically · Lunch deducted from daily target</span>
     </div>
-    <button id="save-shifts" style="width:100%;margin-top:8px;background:var(--accent);color:var(--jcpd-accent-ink);border:none;border-radius:12px;padding:10px;font-size:0.92rem;font-weight:700;cursor:pointer;letter-spacing:-0.2px">Save Schedule</button>
-    <p style="font-size:0.7rem;color:var(--muted);text-align:center;margin-top:6px">Lunch is deducted from your daily target hours</p>
+    <div class="dashboard-card" style="padding:2px 12px">
+      ${weekdayRows}
+      ${weekendRows}
+    </div>
+    <div class="dashboard-card default-lunch-card">
+      <div class="default-lunch-row">
+        <div>
+          <div class="default-lunch-title">Default lunch</div>
+          <div class="default-lunch-sub">Deducted from each day's target</div>
+        </div>
+        <button id="default-lunch-chip" class="default-lunch-chip">${lunchLabels[defaultLunch] || '30 min'}</button>
+      </div>
+    </div>
     <div class="week-note-wrap">
       <label class="week-note-label">Week note</label>
       <textarea id="week-note" class="week-note-input" rows="2"
@@ -2110,6 +2139,7 @@ function attachListeners() {
     const d = new Date(currentWeekKey + 'T00:00:00');
     d.setDate(d.getDate() - 7);
     currentWeekKey = getWeekKey(d);
+    weekendExpanded = false;
     render();
   });
   if (schedNext) schedNext.addEventListener('click', () => {
@@ -2117,7 +2147,7 @@ function attachListeners() {
     d.setDate(d.getDate() + 7);
     const newKey = getWeekKey(d);
     const maxFuture = new Date(); maxFuture.setDate(maxFuture.getDate() + 56);
-    if (newKey <= getWeekKey(maxFuture)) { currentWeekKey = newKey; render(); }
+    if (newKey <= getWeekKey(maxFuture)) { currentWeekKey = newKey; weekendExpanded = false; render(); }
   });
 
   // Log Job day picker
@@ -2285,7 +2315,7 @@ function attachListeners() {
     const days = weekDays(currentWeekKey);
     days.forEach((dk, i) => {
       if (i < 5) {
-        week.shifts[dk] = { start: '08:00', end: '16:30', lunch: '30' };
+        week.shifts[dk] = { start: '08:00', end: '16:30', lunch: String(state.defaultLunch !== undefined ? state.defaultLunch : 30) };
       }
     });
     saveState(state);
@@ -2293,20 +2323,42 @@ function attachListeners() {
     showToast('Standard week applied');
   });
 
-  // Save shifts (captures start, end, and lunch fields)
-  const saveShifts = document.getElementById('save-shifts');
-  if (saveShifts) saveShifts.addEventListener('click', () => {
-    const week = getOrCreateWeek(state, currentWeekKey);
-    if (!week.shifts) week.shifts = {};
-    document.querySelectorAll('.shift-input').forEach(input => {
+  // Auto-save shift inputs on change
+  function flashAutosave() {
+    const el = document.getElementById('autosave-check');
+    if (el) { el.classList.add('flash'); setTimeout(() => el.classList.remove('flash'), 1200); }
+  }
+  document.querySelectorAll('.shift-input').forEach(input => {
+    input.addEventListener('change', () => {
       const dk = input.dataset.day;
       const field = input.dataset.field;
+      const week = getOrCreateWeek(state, currentWeekKey);
+      if (!week.shifts) week.shifts = {};
       if (!week.shifts[dk]) week.shifts[dk] = {};
       week.shifts[dk][field] = input.value;
+      saveState(state);
+      flashAutosave();
+      render();
     });
-    saveState(state);
+  });
+
+  // Weekend expand
+  const weekendAddBtn = document.getElementById('weekend-add-shift');
+  if (weekendAddBtn) weekendAddBtn.addEventListener('click', () => {
+    weekendExpanded = true;
     render();
-    showToast('Schedule saved');
+  });
+
+  // Default lunch chip — cycle through options
+  const defaultLunchChip = document.getElementById('default-lunch-chip');
+  if (defaultLunchChip) defaultLunchChip.addEventListener('click', () => {
+    const opts = [0, 15, 30, 45, 60];
+    const cur = state.defaultLunch !== undefined ? state.defaultLunch : 30;
+    const idx = opts.indexOf(Number(cur));
+    state.defaultLunch = opts[(idx + 1) % opts.length];
+    saveState(state);
+    flashAutosave();
+    render();
   });
 
   // Save starting balance
