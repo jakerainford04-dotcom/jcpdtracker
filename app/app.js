@@ -348,35 +348,22 @@ function buildDashboard() {
     dateStr = 'WK ' + isoWeekOf(wkStart) + ' · ' + fmt(wkStart) + ' – ' + fmt(wkEnd);
   }
 
-  // ── Pace line for Today card ──
-  let paceLine = '';
-  const _isMentorFull = (week.mentorDays || {})[todayKey] === 'full';
-  if (isCurrentWeek && !dayIsLeave(week, todayKey) && !_isMentorFull) {
-    const _cur = new Date().getHours() * 60 + new Date().getMinutes();
-    const _sh  = (week.shifts || {})[todayKey] || {};
-    let _startM = 480, _endM = 990;
-    if (_sh.start && _sh.end) {
-      const [sh, sm] = _sh.start.split(':').map(Number);
-      const [eh, em] = _sh.end.split(':').map(Number);
-      _startM = sh * 60 + sm; _endM = eh * 60 + em;
-    }
-    const _worked  = Math.max(0, _cur - _startM);
-    const _remain  = Math.max(0, _endM - _cur);
-    const _remStr  = _remain >= 60
-      ? `${Math.floor(_remain / 60)}h ${String(_remain % 60).padStart(2, '0')}m left`
-      : `${_remain}m left`;
-    if (_cur >= _endM) {
-      paceLine = `<div class="split-pace pace-muted">Shift complete · ${todayHours.toFixed(2)}h earned</div>`;
-    } else if (_cur < _startM) {
-      const _m = _startM - _cur;
-      paceLine = `<div class="split-pace pace-muted">Starts in ${_m >= 60 ? Math.floor(_m/60)+'h '+_m%60+'m' : _m+'m'}</div>`;
-    } else if (todayHours > 0 && _worked >= 15) {
-      const _proj = todayHours + (todayHours / _worked) * _remain;
-      paceLine = `<div class="split-pace pace-muted">Pacing for ${_proj.toFixed(2)}h today · ${_remStr}</div>`;
-    } else if (_remain > 0) {
-      paceLine = `<div class="split-pace pace-muted">${_remStr}</div>`;
+  // ── Still needed + context line for hero card ──
+  const stillNeeded = Math.max(0, dailyTargetHours - todayHours);
+  let contextLine = '';
+  if (stillNeeded === 0 && dailyTargetHours > 0) {
+    contextLine = "Today's target reached.";
+  } else if (stillNeeded > 0 && todayJobs.length > 0) {
+    const lastJob = todayJobs[todayJobs.length - 1];
+    const creditH = lastJob.creditMins / 60;
+    if (creditH > 0) {
+      const xMore = Math.ceil(stillNeeded / creditH);
+      const lastJobMeta = JOB_META[lastJob.id] || {};
+      const lastJobShort = lastJobMeta.short || lastJob.name.replace(/\s*\(.*$/, '').trim();
+      contextLine = `${xMore} more ${lastJobShort} closes today's gap.`;
     }
   }
+
 
   return `
     ${isCurrentWeek ? `<div class="dash-greeting" id="greeting-text" data-greeting="${greeting}">${greetDisplay}</div>` : ''}
@@ -384,21 +371,26 @@ function buildDashboard() {
     ${week.note ? `<div class="dash-note">${week.note}</div>` : ''}
     <div id="ticker-wrap">${buildTickerStrip()}</div>
 
-    <div class="ctap-hero-card">
-      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
-        <div class="ctap-hero-label">CTAP Balance</div>
-        <span class="status-badge ${balColour}" style="font-size:0.58rem;padding:2px 8px">${displayBal >= 0 ? 'In credit' : 'Deficit'}</span>
+    <div class="hero-jobs-card">
+      <div class="ctap-hero-label" style="margin-bottom:10px">JOB CREDITS</div>
+      <div class="hero-three-row">
+        <div class="hero-col">
+          <div class="hero-col-label">EARNED TODAY</div>
+          <div class="hero-col-num${todayHours > 0 ? ' green' : ''}">${todayHours.toFixed(2)}<span class="hero-col-unit">h</span></div>
+        </div>
+        <div class="hero-col">
+          <div class="hero-col-label">STILL NEEDED</div>
+          <div class="hero-col-num${stillNeeded > 0 ? ' amber' : ' green'}">${stillNeeded.toFixed(2)}<span class="hero-col-unit">h</span></div>
+        </div>
+        <div class="hero-col">
+          <div class="hero-col-label">WEEK GAP</div>
+          <div class="hero-col-num${Math.max(0, targetH - earnedHours) > 0 ? ' amber' : ' green'}">${Math.max(0, targetH - earnedHours).toFixed(2)}<span class="hero-col-unit">h</span></div>
+        </div>
       </div>
-      <div class="ctap-number-row">
-        <span class="ctap-numblock">
-          <span class="ctap-sign ${balSignColour}">${balSign}</span><span class="ctap-int ${displayBal >= 0 ? 'green' : ''}">${balIntNum}</span><span class="ctap-dec">${balDecStr}</span>
-        </span>
-        <span class="ctap-unit">HRS</span>
+      <div class="progress-bar" style="margin-bottom:6px">
+        <div class="progress-bar-fill ${weekColour}" style="width:${weekPct.toFixed(1)}%"></div>
       </div>
-      <div style="display:flex;justify-content:space-between;align-items:center;margin-top:8px">
-        <span style="font-size:0.62rem;color:var(--muted)">Starting balance: <span style="font-weight:600;color:var(--muted)">${(state.startingBalance || 0) >= 0 ? '+' : ''}${(state.startingBalance || 0).toFixed(2)}h</span></span>
-        ${isCurrentWeek ? `<button id="ctap-proj-toggle" class="ctap-proj-btn${ctapProjectedMode ? ' active' : ''}">${ctapProjectedMode ? 'Projected' : 'Actual'}</button>` : ''}
-      </div>
+      ${contextLine ? `<div class="hero-context-line">${contextLine}</div>` : ''}
     </div>
 
     ${isCurrentWeek ? buildDeficitClearedCard() : ''}
@@ -407,14 +399,12 @@ function buildDashboard() {
     <div class="split-cards">
       <div class="split-card">
         <div class="split-card-top">
-          <span class="split-card-label">Today</span>
+          <span class="split-card-label">CTAP</span>
+          <span class="status-badge ${balColour}" style="font-size:0.55rem;padding:2px 7px">${displayBal >= 0 ? 'In credit' : 'Deficit'}</span>
         </div>
-        <div class="split-hours">${todayHours.toFixed(2)}<span class="split-unit">h</span></div>
-        <div class="split-sub">today's job credits</div>
-        ${paceLine}
-        <div class="progress-bar" style="margin-top:auto">
-          <div class="progress-bar-fill ${weekColour}" style="width:${weekPct.toFixed(1)}%"></div>
-        </div>
+        <div class="split-hours" style="color:var(--${balColour})">${balSign}${balIntNum}${balDecStr}<span class="split-unit">h</span></div>
+        <div class="split-sub">balance</div>
+        ${isCurrentWeek ? `<div class="split-pace pace-muted">Starting: ${(state.startingBalance || 0) >= 0 ? '+' : ''}${(state.startingBalance || 0).toFixed(2)}h</div>` : ''}
       </div>
       <div class="split-card" id="week-tile">
         <div class="split-card-top">
@@ -422,6 +412,7 @@ function buildDashboard() {
           <div style="display:flex;align-items:center;gap:4px">
             <span class="pct-badge pct-badge-${weekColour}">${Math.round(weekPct)}%</span>
             ${canShowTrend && trendArrow ? `<span class="week-trend-badge week-trend-${trendCls}">${trendArrow} ${trendSign}${Math.abs(trendNetChange).toFixed(1)}h</span>` : ''}
+            ${isCurrentWeek ? `<button id="ctap-proj-toggle" class="ctap-proj-btn${ctapProjectedMode ? ' active' : ''}">${ctapProjectedMode ? 'Projected' : 'Actual'}</button>` : ''}
           </div>
         </div>
         <div class="split-hours">${earnedHours.toFixed(2)}<span class="split-unit">h</span></div>
@@ -431,6 +422,8 @@ function buildDashboard() {
         <div class="week-chart">${weekBarsHTML}</div>
       </div>
     </div>
+
+    ${isCurrentWeek ? buildBestAdviceStrip(stillNeeded, todayJobs, week, todayKey) : ''}
 
     <details class="insights-details"${hasAny ? ' open' : ''}>
       <summary class="insights-summary">
@@ -1284,6 +1277,26 @@ function buildSettings() {
     `<button class="st-info-btn${openSettingsInfo === key ? ' active' : ''}" data-info="${key}">i</button>`;
   const infoPopover = text => `<div class="st-info-popover">${text}</div>`;
 
+  const TRAVEL_PRESETS = [
+    { id: 'light',    label: 'Light',    desc: 'City or town patch',            mins: 45  },
+    { id: 'moderate', label: 'Moderate', desc: 'Mixed area, typical spread',    mins: 90  },
+    { id: 'heavy',    label: 'Heavy',    desc: 'Rural or large patch',          mins: 120 },
+  ];
+  const travelProfile = state.travelProfile || null;
+  const travelMins    = state.travelMinsPerDay || 0;
+  const travelWeekH   = (travelMins / 60) * 5;
+  const travelTargetAfter = Math.max(0, baseHours * (wkPct / 100) - travelWeekH);
+  const impactLine = travelMins > 0
+    ? `Est. ${travelWeekH.toFixed(1)}h deducted per week — adjusts your target from ${baseHours}h to ~${travelTargetAfter.toFixed(1)}h. Actual figure confirmed after each pay period.`
+    : `Select a profile or enter a custom value to see the impact.`;
+  const travelSegHTML = TRAVEL_PRESETS.map(p =>
+    `<button class="st-travel-btn${travelProfile === p.id ? ' active' : ''}" data-travel-preset="${p.id}">
+      <span class="st-travel-name">${p.label}</span>
+      <span class="st-travel-desc">${p.desc}</span>
+      <span class="st-travel-mins">~${p.mins < 60 ? p.mins + 'min' : (p.mins / 60) + 'h'}</span>
+    </button>`
+  ).join('');
+
   return `
     ${sectionLabel('APPEARANCE')}
     <div class="st-card">
@@ -1305,6 +1318,22 @@ function buildSettings() {
           <span class="coach-slider"></span>
         </label>
       </div>
+    </div>
+
+    ${sectionLabel('TRAVEL PROFILE')}
+    <div class="st-card">
+      <div class="st-travel-seg">${travelSegHTML}</div>
+      ${rowDiv()}
+      <div class="st-impact-line">${impactLine}</div>
+      ${rowDiv()}
+      <div class="st-row">
+        <span class="st-row-label">Know your average? Set it yourself</span>
+        <div class="st-row-controls">
+          ${numInput('travel-mins-input', travelMins > 0 ? travelMins : '', 'min/day', 'min="0" max="240" inputmode="numeric" placeholder="—"')}
+        </div>
+      </div>
+      ${rowDiv()}
+      <div class="st-travel-note">Travel card figures settle two weeks after each pay period. Your profile gives the app a working assumption so the maths stays accurate in real time.</div>
     </div>
 
     ${sectionLabel('TARGETS')}
@@ -1359,7 +1388,7 @@ function buildSettings() {
     <div class="st-card">
       <div class="st-row">
         <span class="st-row-label">Version</span>
-        <span class="st-row-value">v0.4.0 · ${_ctapUser ? 'synced' : 'local'}</span>
+        <span class="st-row-value">v0.5.0 · ${_ctapUser ? 'synced' : 'local'}</span>
       </div>
       ${rowDiv()}
       <button class="st-nav-row" id="toggle-credits-info">
@@ -2463,6 +2492,33 @@ function attachListeners() {
     v => Math.max(-999, Math.min(999, parseFloat(v) || 0)),
     () => (state.startingBalance || 0).toFixed(1));
 
+  // Travel preset buttons
+  const TRAVEL_PRESET_MINS = { light: 45, moderate: 90, heavy: 120 };
+  document.querySelectorAll('[data-travel-preset]').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const preset = btn.dataset.travelPreset;
+      state.travelProfile    = preset;
+      state.travelMinsPerDay = TRAVEL_PRESET_MINS[preset];
+      saveState(state);
+      showToast('✓ Travel profile saved');
+      render();
+    });
+  });
+  bindNumInput('travel-mins-input',
+    v => { state.travelMinsPerDay = v; state.travelProfile = null; },
+    v => Math.max(0, Math.min(240, parseInt(v) || 0)),
+    () => state.travelMinsPerDay > 0 ? state.travelMinsPerDay : '');
+
+  // Best advice strip dismiss
+  document.querySelectorAll('[data-dismiss-opp]').forEach(btn => {
+    btn.addEventListener('click', e => {
+      e.stopPropagation();
+      localStorage.setItem(`jcpd_coach_opp_${btn.dataset.dismissDay}_${btn.dataset.dismissOpp}`, 'true');
+      const strip = document.getElementById('coach-opp-strip');
+      if (strip) strip.remove();
+    });
+  });
+
   // Settings info popovers
   document.querySelectorAll('.st-info-btn').forEach(btn => {
     btn.addEventListener('click', e => {
@@ -2918,6 +2974,73 @@ function buildCoachLogBanner() {
   }
   if (!text) return '';
   return `<div class="coach-log-banner">${text}</div>`;
+}
+
+function buildBestAdviceStrip(stillNeeded, todayJobs, week, todayKey) {
+  if (!isCoachModeOn()) return '';
+  if (stillNeeded <= 0) return '';
+
+  // Check shift status: not complete and > 30 min remaining
+  const now = new Date();
+  const cur = now.getHours() * 60 + now.getMinutes();
+  const sh = (week.shifts || {})[todayKey] || {};
+  let endM = 990; // default 16:30
+  if (sh.end) {
+    const [eh, em] = sh.end.split(':').map(Number);
+    endM = eh * 60 + em;
+  }
+  if (cur >= endM) return '';
+  if (endM - cur < 30) return '';
+
+  const todayIds = new Set(todayJobs.map(j => j.id));
+
+  // Credit values from JOB_TYPES.sales — single source of truth
+  const findSales = id => JOB_TYPES.sales.find(j => j.id === id);
+  const hiveFitJ   = findSales('hive_sale_fit');
+  const hiveSgoJ   = findSales('hive_sale_sgo');
+  const inhibitorJ = findSales('inhibitor');
+  const boilerJ    = findSales('hi_lead');
+
+  const serviceBreakdownIds = new Set(['ib_ff','linked_ib','asv_chb_cir_wh_swh','asv_fre','asv_bbf_wau_waw_aga','asv_mwh_wal','asv_hob_ckr_ovn','as_inst','fv_chb','fv_bbf_wau_waw']);
+  const boilerTriggerIds    = new Set(['asv_chb_cir_wh_swh','asv_fre','asv_bbf_wau_waw_aga','asv_mwh_wal','asv_hob_ckr_ovn','as_inst','fv_chb','fv_bbf_wau_waw','ib_ff','linked_ib']);
+
+  let opp = null;
+
+  // P1: Hive fit and sale
+  if (hiveFitJ && hiveSgoJ && !todayIds.has('hive_sale_fit') && !todayIds.has('hive_sale_sgo')) {
+    opp = { id: 'hive_fit_sale', name: 'Hive fit and sale', credits: hiveFitJ.credits + hiveSgoJ.credits };
+  }
+
+  // P2: Inhibitor
+  if (!opp && inhibitorJ && !todayIds.has('inhibitor')) {
+    const hasServiceBreakdown = [...todayIds].some(id => serviceBreakdownIds.has(id));
+    if (hasServiceBreakdown) {
+      opp = { id: 'inhibitor', name: 'Inhibitor', credits: inhibitorJ.credits };
+    }
+  }
+
+  // P3: Boiler lead
+  if (!opp && boilerJ && !todayIds.has('hi_lead')) {
+    const hasBoilerTrigger = [...todayIds].some(id => boilerTriggerIds.has(id));
+    if (hasBoilerTrigger) {
+      opp = { id: 'boiler_lead', name: 'Boiler lead', credits: boilerJ.credits };
+    }
+  }
+
+  if (!opp) return '';
+
+  const dismissKey = `jcpd_coach_opp_${todayKey}_${opp.id}`;
+  if (localStorage.getItem(dismissKey) === 'true') return '';
+
+  const pct = Math.round((opp.credits / stillNeeded) * 100);
+
+  return `<div class="coach-opp-strip" id="coach-opp-strip">
+    <div class="coach-opp-body">
+      <span class="coach-opp-label">Best advice opportunity</span>
+      <span class="coach-opp-line">${opp.name} = ${pct}% of today's remaining gap</span>
+    </div>
+    <button class="coach-opp-dismiss" data-dismiss-opp="${opp.id}" data-dismiss-day="${todayKey}">✕</button>
+  </div>`;
 }
 
 // ── Utils ──────────────────────────────────────────────────────────────────

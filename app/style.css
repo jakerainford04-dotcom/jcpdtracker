@@ -3119,3 +3119,161 @@ details[open] .info-chevron { transform: rotate(90deg); }
   color: var(--muted);
 }
 
+/* ── JOB CREDITS Hero Card ── */
+.hero-jobs-card {
+  background: var(--surface);
+  border-radius: var(--jcpd-r-lg);
+  border: 1px solid var(--tile-border);
+  padding: 16px 18px 13px;
+  margin-bottom: 10px;
+}
+.hero-three-row {
+  display: flex;
+  gap: 0;
+  margin-bottom: 10px;
+}
+.hero-col {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  padding-right: 8px;
+}
+.hero-col + .hero-col {
+  border-left: 0.5px solid var(--sep);
+  padding-left: 12px;
+  padding-right: 0;
+  margin-left: 4px;
+}
+.hero-col-label {
+  font-size: 0.52rem;
+  font-weight: 600;
+  letter-spacing: 0.09em;
+  color: var(--muted);
+  text-transform: uppercase;
+  margin-bottom: 4px;
+}
+.hero-col-num {
+  font-size: 1.75rem;
+  font-weight: 800;
+  line-height: 1;
+  letter-spacing: -1.5px;
+  font-family: var(--jcpd-font-sans);
+  color: var(--text);
+}
+.hero-col-unit {
+  font-size: 0.85rem;
+  font-weight: 600;
+  letter-spacing: 0;
+}
+.hero-col-num.green { color: var(--green); }
+.hero-col-num.amber { color: var(--amber); }
+.hero-col-num.red   { color: var(--red); }
+.hero-context-line {
+  font-size: 0.7rem;
+  color: var(--muted);
+  margin-top: 6px;
+  line-height: 1.4;
+}
+
+/* ── Best Advice Coaching Strip ── */
+.coach-opp-strip {
+  background: rgba(74, 134, 216, 0.07);
+  border: 1px solid rgba(74, 134, 216, 0.2);
+  border-radius: var(--jcpd-r-md);
+  padding: 10px 12px;
+  margin-bottom: 10px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.coach-opp-body {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.coach-opp-label {
+  font-size: 0.55rem;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--accent);
+}
+.coach-opp-line {
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: var(--text);
+  line-height: 1.3;
+}
+.coach-opp-dismiss {
+  background: none;
+  border: none;
+  color: var(--muted2);
+  font-size: 1rem;
+  cursor: pointer;
+  padding: 4px 6px;
+  flex-shrink: 0;
+  line-height: 1;
+  -webkit-tap-highlight-color: transparent;
+  touch-action: manipulation;
+}
+.coach-opp-dismiss:active { color: var(--text); }
+
+/* ── Travel Profile (Settings) ── */
+.st-travel-seg {
+  display: flex;
+  gap: 6px;
+  padding-bottom: 4px;
+}
+.st-travel-btn {
+  flex: 1;
+  background: var(--surface2);
+  border: 1.5px solid var(--sep);
+  border-radius: var(--jcpd-r-sm);
+  padding: 8px 4px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 3px;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+  touch-action: manipulation;
+  transition: background 0.1s;
+}
+.st-travel-btn.active {
+  background: var(--jcpd-accent-dim);
+  border-color: var(--accent);
+}
+.st-travel-name {
+  font-size: 0.75rem;
+  font-weight: 700;
+  color: var(--text);
+}
+.st-travel-btn.active .st-travel-name { color: var(--accent); }
+.st-travel-desc {
+  font-size: 0.59rem;
+  color: var(--muted);
+  text-align: center;
+  line-height: 1.3;
+}
+.st-travel-mins {
+  font-size: 0.66rem;
+  font-weight: 700;
+  color: var(--accent);
+  margin-top: 1px;
+}
+.st-impact-line {
+  font-size: 0.72rem;
+  color: var(--muted);
+  padding: 8px 0;
+  line-height: 1.5;
+}
+.st-travel-note {
+  font-size: 0.67rem;
+  color: var(--muted2);
+  padding: 8px 0 2px;
+  line-height: 1.5;
+  font-style: italic;
+}
+

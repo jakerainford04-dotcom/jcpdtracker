@@ -146,6 +146,15 @@ function weekMentorTargetReduction(state, week) {
   return reduction;
 }
 
+function getTravelDeductionHours(state, week) {
+  const minsPerDay = state.travelMinsPerDay || 0;
+  if (minsPerDay <= 0 || !state.baseHours) return 0;
+  const dailyH = state.baseHours / 5;
+  const rostered = rosteredHours(state, week);
+  const effectiveDays = dailyH > 0 ? rostered / dailyH : 0;
+  return effectiveDays * minsPerDay / 60;
+}
+
 function cumulativeBalance(state) {
   var currentWk = getWeekKey(new Date());
   var total = state.startingBalance || 0;
@@ -201,12 +210,13 @@ function rosteredHours(state, week) {
   return state.baseHours - weekLeaveHours(state, week) - weekMentorTargetReduction(state, week);
 }
 
-// Adjusted target = rostered × configured % (default 80%) minus NPT deductions
+// Adjusted target = rostered × configured % (default 80%) minus NPT deductions and travel
 function adjustedTargetHours(state, week) {
   const rostered = rosteredHours(state, week);
   const pct = typeof state.weeklyTargetPct === 'number' ? state.weeklyTargetPct : 0.8;
   const npt = (week.deductionMins || 0) / 60;
-  return Math.max(0, rostered * pct - npt);
+  const travel = getTravelDeductionHours(state, week);
+  return Math.max(0, rostered * pct - npt - travel);
 }
 
 // Rolling average of last 4–6 completed non-empty weeks before weekKey
@@ -231,14 +241,15 @@ function rollingAvgInfo(state, weekKey) {
 function effectiveTargetHours(state, week, weekKey) {
   const rostered = rosteredHours(state, week);
   const npt = (week.deductionMins || 0) / 60;
+  const travel = getTravelDeductionHours(state, week);
   const rolling = rollingAvgInfo(state, weekKey);
   if (rolling && state.baseHours > 0) {
     const scaledAvg = rolling.avg * (rostered / state.baseHours);
-    return { hours: Math.max(0, scaledAvg - npt), isRolling: true, n: rolling.n, displayTarget: Math.max(0, scaledAvg) };
+    return { hours: Math.max(0, scaledAvg - npt - travel), isRolling: true, n: rolling.n, displayTarget: Math.max(0, scaledAvg) };
   }
   const pct = typeof state.weeklyTargetPct === 'number' ? state.weeklyTargetPct : 0.8;
   const displayTarget = rostered * pct;
-  return { hours: Math.max(0, displayTarget - npt), isRolling: false, n: 0, displayTarget };
+  return { hours: Math.max(0, displayTarget - npt - travel), isRolling: false, n: 0, displayTarget };
 }
 
 function bonusAchieved(state, week) {
